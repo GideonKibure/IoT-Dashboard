@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Dashboard | IoT Control Panel</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="animated-bg">
+        <div class="grid-lines"></div>
+        <div class="data-streams"></div>
+        <div class="floating-nodes"></div>
+        <div class="pulse-effects"></div>
+        <div class="connection-mesh"></div>
+        <div class="energy-ripples"></div>
+        <canvas class="bg-canvas" id="bgCanvas"></canvas>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-main">
+                <div class="brand">
+                    <div class="logo">
+                        <div class="logo-icon">
+                            <i class="fas fa-home"></i>
+                            <div class="logo-pulse"></div>
+                        </div>
+                        <div class="logo-text">
+                            <h1>NEXUS CONTROL</h1>
+                            <p class="subtitle">Smart Home Dashboard v4.0</p>
+                        </div>
+                    </div>
+                    <div class="system-status">
+                        <div class="status-item">
+                            <span class="status-dot active"></span>
+                            <span class="status-label">All Systems Online</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-dot"></span>
+                            <span class="status-label">Network: 98%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="header-controls">
+                    <div class="time-display" id="time-display">
+                        <i class="fas fa-clock"></i>
+                        <span id="current-time">--:--:--</span>
+                    </div>
+                    <button class="btn-theme" id="theme-toggle" aria-label="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                        <span>Dark Mode</span>
+                    </button>
+                    <button class="btn-notifications" id="notification-toggle">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-count">3</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Quick Stats Bar -->
+        <section class="quick-stats">
+            <div class="stat-card pulse">
+                <div class="stat-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <div class="stat-info">
+                    <h4>Power Usage</h4>
+                    <div class="stat-value" id="power-usage">1.24 kW</div>
+                    <div class="stat-progress">
+                        <div class="progress-bar" style="width: 65%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card pulse">
+                <div class="stat-icon">
+                    <i class="fas fa-network-wired"></i>
+                </div>
+                <div class="stat-info">
+                    <h4>Connected Devices</h4>
+                    <div class="stat-value" id="connected-devices">12</div>
+                    <div class="stat-trend up">+2 today</div>
+                </div>
+            </div>
+            
+            <div class="stat-card pulse">
+                <div class="stat-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="stat-info">
+                    <h4>Security Status</h4>
+                    <div class="stat-value secure">ARMED</div>
+                    <div class="stat-detail">All zones secure</div>
+                </div>
+            </div>
+            
+            <div class="stat-card pulse">
+                <div class="stat-icon">
+                    <i class="fas fa-leaf"></i>
+                </div>
+                <div class="stat-info">
+                    <h4>Energy Saved</h4>
+                    <div class="stat-value" id="energy-saved">4.8 kWh</div>
+                    <div class="stat-detail">Today</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Dashboard Grid -->
+        <main class="dashboard-grid">
+            <!-- Left Column - Device Controls -->
+            <div class="dashboard-column">
+                <!-- Lighting Control -->
+                <div class="control-card interactive">
+                    <div class="card-header">
+                        <div class="device-icon lighting">
+                            <i class="fas fa-lightbulb"></i>
+                        </div>
+                        <h3>Smart Lighting</h3>
+                        <div class="device-status" id="lighting-status">ONLINE</div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Brightness</span>
+                                <span class="value" id="brightness-value">75%</span>
+                            </div>
+                            <input type="range" class="slider" id="brightness-slider" min="0" max="100" value="75">
+                        </div>
+                        
+                        <div class="control-buttons">
+                            <button class="btn-control active" data-scene="relax">
+                                <i class="fas fa-couch"></i>
+                                <span>Relax</span>
+                            </button>
+                            <button class="btn-control" data-scene="focus">
+                                <i class="fas fa-desktop"></i>
+                                <span>Focus</span>
+                            </button>
+                            <button class="btn-control" data-scene="night">
+                                <i class="fas fa-moon"></i>
+                                <span>Night</span>
+                            </button>
+                        </div>
+                        
+                        <div class="power-toggle">
+                            <button class="toggle-btn" id="light-toggle">
+                                <span class="toggle-track">
+                                    <span class="toggle-knob"></span>
+                                </span>
+                                <span class="toggle-label">ON</span>
+                            </button>
+                            <div class="energy-info">
+                                <span>Usage:</span>
+                                <span id="light-energy">0.8 kW</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Climate Control -->
+                <div class="control-card interactive">
+                    <div class="card-header">
+                        <div class="device-icon climate">
+                            <i class="fas fa-thermometer-half"></i>
+                        </div>
+                        <h3>Climate Control</h3>
+                        <div class="device-status" id="climate-status">HEATING</div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="temp-display">
+                            <div class="temp-current">
+                                <span class="temp-value" id="current-temp">72</span>
+                                <span class="temp-unit">°F</span>
+                            </div>
+                            <div class="temp-set">
+                                <span>Set to:</span>
+                                <span class="temp-target" id="target-temp">70°F</span>
+                            </div>
+                        </div>
+                        
+                        <div class="temp-control">
+                            <button class="temp-btn" id="temp-down">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <div class="temp-presets">
+                                <button class="preset-btn" data-temp="68">68°</button>
+                                <button class="preset-btn active" data-temp="72">72°</button>
+                                <button class="preset-btn" data-temp="76">76°</button>
+                            </div>
+                            <button class="temp-btn" id="temp-up">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="climate-info">
+                            <div class="info-item">
+                                <span>Humidity</span>
+                                <span class="value" id="humidity">45%</span>
+                            </div>
+                            <div class="info-item">
+                                <span>Energy</span>
+                                <span class="value" id="climate-energy">1.2 kW</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security System -->
+                <div class="control-card interactive">
+                    <div class="card-header">
+                        <div class="device-icon security">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h3>Security System</h3>
+                        <div class="device-status armed">ARMED</div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="security-status">
+                            <div class="zone-grid">
+                                <div class="zone-item active">
+                                    <i class="fas fa-door-closed"></i>
+                                    <span>Front Door</span>
+                                </div>
+                                <div class="zone-item">
+                                    <i class="fas fa-door-closed"></i>
+                                    <span>Back Door</span>
+                                </div>
+                                <div class="zone-item active">
+                                    <i class="fas fa-video"></i>
+                                    <span>Camera 1</span>
+                                </div>
+                                <div class="zone-item">
+                                    <i class="fas fa-video"></i>
+                                    <span>Camera 2</span>
+                                </div>
+                                <div class="zone-item">
+                                    <i class="fas fa-window-maximize"></i>
+                                    <span>Living Room</span>
+                                </div>
+                                <div class="zone-item active">
+                                    <i class="fas fa-window-maximize"></i>
+                                    <span>Kitchen</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="security-controls">
+                            <button class="security-btn arm-home">
+                                <i class="fas fa-home"></i>
+                                <span>Arm Home</span>
+                            </button>
+                            <button class="security-btn arm-away">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Arm Away</span>
+                            </button>
+                            <button class="security-btn disarm">
+                                <i class="fas fa-unlock"></i>
+                                <span>Disarm</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Column - Main Controls -->
+            <div class="dashboard-column">
+                <!-- Surveillance Center -->
+                <div class="surveillance-card interactive">
+                    <div class="card-header">
+                        <h3><i class="fas fa-video"></i> Live Surveillance</h3>
+                        <div class="header-actions">
+                            <button class="icon-btn" id="record-btn">
+                                <i class="fas fa-circle"></i>
+                            </button>
+                            <button class="icon-btn" id="snapshot-btn">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="camera-grid">
+                        <div class="camera-feed active">
+                            <div class="camera-header">
+                                <span class="camera-name">Front Door</span>
+                                <span class="camera-status live">LIVE</span>
+                            </div>
+                            <div class="camera-view" id="camera-1">
+                                <div class="camera-overlay">
+                                    <div class="timestamp" id="camera-timestamp">14:32:45</div>
+                                    <div class="camera-info">
+                                        <span>1080p • 30fps</span>
+                                        <span>Motion: Active</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="camera-feed">
+                            <div class="camera-header">
+                                <span class="camera-name">Backyard</span>
+                                <span class="camera-status">OFFLINE</span>
+                            </div>
+                            <div class="camera-view" id="camera-2">
+                                <div class="camera-overlay offline">
+                                    <i class="fas fa-video-slash"></i>
+                                    <span>Camera Offline</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="camera-feed">
+                            <div class="camera-header">
+                                <span class="camera-name">Garage</span>
+                                <span class="camera-status">IDLE</span>
+                            </div>
+                            <div class="camera-view" id="camera-3">
+                                <div class="camera-overlay idle">
+                                    <i class="fas fa-eye-slash"></i>
+                                    <span>Motion Detection Only</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="camera-feed">
+                            <div class="camera-header">
+                                <span class="camera-name">Living Room</span>
+                                <span class="camera-status live">LIVE</span>
+                            </div>
+                            <div class="camera-view" id="camera-4">
+                                <div class="camera-overlay">
+                                    <div class="timestamp">14:32:45</div>
+                                    <div class="camera-info">
+                                        <span>720p • 15fps</span>
+                                        <span>Motion: Inactive</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="camera-controls">
+                        <button class="btn-camera" id="all-cameras">
+                            <i class="fas fa-power-off"></i>
+                            <span>Toggle All</span>
+                        </button>
+                        <div class="storage-info">
+                            <span>Storage: </span>
+                            <span class="storage-value" id="storage-used">4.2/10 GB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Energy Analytics -->
+                <div class="analytics-card interactive">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-line"></i> Energy Analytics</h3>
+                        <div class="time-filter">
+                            <button class="filter-btn active">Day</button>
+                            <button class="filter-btn">Week</button>
+                            <button class="filter-btn">Month</button>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="energy-chart"></canvas>
+                    </div>
+                    
+                    <div class="analytics-summary">
+                        <div class="summary-item">
+                            <span class="label">Peak Usage</span>
+                            <span class="value" id="peak-usage">2.4 kW</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="label">Avg Daily</span>
+                            <span class="value" id="avg-usage">12.5 kWh</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="label">Cost Today</span>
+                            <span class="value" id="daily-cost">$1.85</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="label">Efficiency</span>
+                            <span class="value efficiency">87%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Smart Devices -->
+            <div class="dashboard-column">
+                <!-- Smart Devices Grid -->
+                <div class="devices-grid">
+                    <div class="device-tile interactive" data-device="plug1">
+                        <div class="tile-header">
+                            <div class="device-icon plug">
+                                <i class="fas fa-plug"></i>
+                            </div>
+                            <h4>Living Room Lamp</h4>
+                        </div>
+                        <div class="tile-body">
+                            <div class="device-status">
+                                <span class="status">ON</span>
+                                <span class="power">45W</span>
+                            </div>
+                            <button class="tile-toggle active">
+                                <span class="toggle-indicator"></span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="device-tile interactive" data-device="thermo">
+                        <div class="tile-header">
+                            <div class="device-icon thermostat">
+                                <i class="fas fa-temperature-high"></i>
+                            </div>
+                            <h4>Bedroom AC</h4>
+                        </div>
+                        <div class="tile-body">
+                            <div class="device-status">
+                                <span class="status">COOLING</span>
+                                <span class="temp">72°F</span>
+                            </div>
+                            <button class="tile-toggle">
+                                <span class="toggle-indicator"></span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="device-tile interactive" data-device="lock">
+                        <div class="tile-header">
+                            <div class="device-icon lock">
+                                <i class="fas fa-lock"></i>
+                            </div>
+                            <h4>Front Door Lock</h4>
+                        </div>
+                        <div class="tile-body">
+                            <div class="device-status">
+                                <span class="status">LOCKED</span>
+                                <span class="detail">09:32 AM</span>
+                            </div>
+                            <button class="tile-btn">
+                                <i class="fas fa-key"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="device-tile interactive" data-device="blinds">
+                        <div class="tile-header">
+                            <div class="device-icon blinds">
+                                <i class="fas fa-window-maximize"></i>
+                            </div>
+                            <h4>Smart Blinds</h4>
+                        </div>
+                        <div class="tile-body">
+                            <div class="device-status">
+                                <span class="status">75% OPEN</span>
+                                <span class="detail">Auto</span>
+                            </div>
+                            <button class="tile-btn">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="device-tile interactive" data-device="speaker">
+                        <div class="tile-header">
+                            <div class="device-icon audio">
+                                <i class="fas fa-volume-up"></i>
+                            </div>
+                            <h4>Living Room Audio</h4>
+                        </div>
+                        <div class="tile-body">
+                            <div class="device-status">
+                                <span class="status">PLAYING</span>
+                                <span class="detail">Jazz</span>
+                            </div>
+                            <button class="tile-btn">
+                                <i class="fas fa-pause"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="device-tile interactive" data-device="vacuum">
+                        <div class="tile-header">
+                            <div class="device-icon robot">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h4>Robot Vacuum</h4>
+                        </div>
+                        <div class="tile-body">
+                            <div class="device-status">
+                                <span class="status">CHARGING</span>
+                                <span class="detail">85%</span>
+                            </div>
+                            <button class="tile-btn">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications Panel -->
+                <div class="notifications-panel">
+                    <div class="panel-header">
+                        <h4><i class="fas fa-bell"></i> Recent Activity</h4>
+                        <button class="btn-clear" id="clear-notifications">Clear All</button>
+                    </div>
+                    
+                    <div class="notifications-list" id="notifications-list">
+                        <div class="notification-item">
+                            <div class="notification-icon info">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <div class="notification-content">
+                                <div class="notification-title">Front Door Opened</div>
+                                <div class="notification-time">2 minutes ago</div>
+                            </div>
+                        </div>
+                        
+                        <div class="notification-item">
+                            <div class="notification-icon success">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="notification-content">
+                                <div class="notification-title">AC Schedule Activated</div>
+                                <div class="notification-time">15 minutes ago</div>
+                            </div>
+                        </div>
+                        
+                        <div class="notification-item">
+                            <div class="notification-icon warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="notification-content">
+                                <div class="notification-title">High Energy Usage Detected</div>
+                                <div class="notification-time">1 hour ago</div>
+                            </div>
+                        </div>
+                        
+                        <div class="notification-item">
+                            <div class="notification-icon alert">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="notification-content">
+                                <div class="notification-title">Motion Detected - Backyard</div>
+                                <div class="notification-time">3 hours ago</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="dashboard-footer">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <div class="system-metrics">
+                        <span class="metric">Uptime: <strong>99.8%</strong></span>
+                        <span class="metric">Devices: <strong>12/12</strong></span>
+                        <span class="metric">Response: <strong>28ms</strong></span>
+                    </div>
+                </div>
+                
+                <div class="footer-center">
+                    <p class="copyright">
+                        Smart Home Dashboard v4.0 • IoT Control System
+                    </p>
+                    <p class="author">
+                        Designed and developed with ❤️ by 
+                        <a href="https://github.com/gideon-kibure" target="_blank" class="author-link">
+                            Gideon Kibure
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </p>
+                </div>
+                
+                <div class="footer-right">
+                    <div class="social-links">
+                        <a href="#" class="social-link"><i class="fab fa-github"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-linkedin"></i></a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Device Details</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
