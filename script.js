@@ -1,1301 +1,1629 @@
-// Smart Home Dashboard - Enhanced Interactive Version
-// Complete IoT simulation with animated background
+// Smart Home Dashboard - Enhanced Animated Background Version
+// Complete IoT simulation with fast animations
 
-// State Management
+// Global State Management
 const state = {
     theme: 'dark',
     devices: {
-        lighting: {
-            status: true,
-            brightness: 75,
-            power: 0.8,
-            scene: 'relax',
-            energy: 2.4
-        },
-        climate: {
-            status: true,
-            currentTemp: 72,
-            targetTemp: 72,
-            mode: 'heating',
-            humidity: 45,
-            power: 1.2
-        },
-        security: {
-            armed: true,
-            mode: 'home',
-            zones: {
-                'front-door': true,
-                'back-door': false,
-                'camera-1': true,
-                'camera-2': false,
-                'living-room': false,
-                'kitchen': true
+        lights: {
+            id: 'lights',
+            name: 'Main Lights',
+            status: false,
+            brightness: 0,
+            color: 'warm',
+            energyRate: 0.05,
+            energyUsage: 0,
+            uptime: 0,
+            lastChange: null,
+            rooms: {
+                living: false,
+                bedroom: false,
+                kitchen: false
             }
         },
-        cameras: {
-            'camera-1': { status: 'live', recording: false },
-            'camera-2': { status: 'offline', recording: false },
-            'camera-3': { status: 'idle', recording: false },
-            'camera-4': { status: 'live', recording: false }
+        thermostat: {
+            id: 'thermostat',
+            name: 'Climate Control',
+            temperature: 22.2,
+            setpoint: 22.2,
+            mode: 'heat',
+            status: 'idle',
+            energyRate: 0.5,
+            energyUsage: 0,
+            humidity: 45,
+            lastChange: null
         },
-        smartDevices: {
-            'plug1': { status: true, power: 45, name: 'Living Room Lamp' },
-            'thermo': { status: true, temp: 72, name: 'Bedroom AC' },
-            'lock': { status: true, locked: true, name: 'Front Door Lock' },
-            'blinds': { status: true, position: 75, name: 'Smart Blinds' },
-            'speaker': { status: true, playing: true, name: 'Living Room Audio' },
-            'vacuum': { status: false, charging: true, name: 'Robot Vacuum' }
+        security: {
+            id: 'security',
+            name: 'Security System',
+            armed: true,
+            mode: 'home',
+            sensors: {
+                'front-door': { active: false, status: 'secure', lastTrigger: null },
+                'back-door': { active: true, status: 'open', lastTrigger: null },
+                'living-room': { active: false, status: 'secure', lastTrigger: null },
+                'motion': { active: false, status: 'active', lastTrigger: null }
+            },
+            lastAlert: null
+        },
+        camera: {
+            id: 'camera',
+            name: 'Surveillance Camera',
+            status: false,
+            recording: false,
+            live: false,
+            energyRate: 0.1,
+            energyUsage: 0,
+            uptime: 0,
+            storage: 2.4,
+            maxStorage: 10,
+            lastSnapshot: null,
+            motionDetected: false
+        },
+        devices: {
+            'plug1': { id: 'plug1', name: 'Living Room Lamp', status: false, power: 0, energyUsage: 0 },
+            'plug2': { id: 'plug2', name: 'TV & Entertainment', status: true, power: 120, energyUsage: 0.8 },
+            'ac': { id: 'ac', name: 'Air Conditioner', status: true, power: 1500, energyUsage: 3.2 }
         }
     },
     analytics: {
+        period: 'day',
+        data: {
+            day: Array.from({length: 24}, () => Math.random() * 2 + 0.5),
+            week: Array.from({length: 7}, () => Math.random() * 2.5 + 0.5),
+            month: Array.from({length: 30}, () => Math.random() * 3 + 0.5)
+        },
         peakUsage: 2.4,
-        avgUsage: 1.2,
-        dailyCost: 1.85,
-        efficiency: 87,
-        energySaved: 4.8,
-        connectedDevices: 12
+        todayCost: 1050.85,
+        carbonSaved: 4.2,
+        efficiency: 87
     },
+    activity: [],
     notifications: [],
-    backgroundAnimation: {
-        speed: 1,
-        intensity: 0.5,
-        particles: 50,
-        connections: true
+    animation: {
+        particles: [],
+        connections: [],
+        streams: [],
+        canvas: null,
+        ctx: null,
+        animationId: null,
+        mouse: { x: 0, y: 0 },
+        lastTime: 0
     }
 };
 
-// Canvas Background Animation
-class BackgroundAnimation {
+// DOM Elements
+const DOM = {
+    // Theme
+    themeToggle: document.getElementById('theme-toggle'),
+    
+    // Header
+    connectionStatus: document.getElementById('connection-status'),
+    currentTime: document.getElementById('current-time'),
+    currentDate: document.getElementById('current-date'),
+    
+    // Quick Stats
+    currentEnergy: document.getElementById('current-energy'),
+    energyProgress: document.getElementById('energy-progress'),
+    homeTemp: document.getElementById('home-temp'),
+    tempFill: document.getElementById('temp-fill'),
+    securityStatus: document.getElementById('security-status'),
+    networkHealth: document.getElementById('network-health'),
+    
+    // Lights
+    lightStatus: document.getElementById('light-status'),
+    toggleMainLight: document.getElementById('toggle-main-light'),
+    lightBrightness: document.getElementById('light-brightness'),
+    brightnessValue: document.getElementById('brightness-value'),
+    lightEnergy: document.getElementById('light-energy'),
+    lightUptime: document.getElementById('light-uptime'),
+    lightCost: document.getElementById('light-cost'),
+    lightGlow: document.getElementById('light-glow'),
+    roomToggles: document.querySelectorAll('.room-toggle'),
+    colorPresets: document.querySelectorAll('.color-preset'),
+    lightsAllOn: document.getElementById('lights-all-on'),
+    
+    // Thermostat
+    temperatureValue: document.getElementById('temperature-value'),
+    setpointValue: document.getElementById('setpoint-value'),
+    decreaseTemp: document.getElementById('decrease-temp'),
+    increaseTemp: document.getElementById('increase-temp'),
+    tempSlider: document.getElementById('temp-slider'),
+    thermostatMode: document.getElementById('thermostat-mode'),
+    thermostatEnergy: document.getElementById('thermostat-energy'),
+    humidityValue: document.getElementById('humidity-value'),
+    modeButtons: document.querySelectorAll('.mode-btn'),
+    climateAuto: document.getElementById('climate-auto'),
+    
+    // Security
+    securitySystemStatus: document.getElementById('security-system-status'),
+    panicButton: document.getElementById('panic-button'),
+    armHome: document.getElementById('arm-home'),
+    armAway: document.getElementById('arm-away'),
+    disarmSystem: document.getElementById('disarm-system'),
+    toggleCamera: document.getElementById('toggle-camera'),
+    cameraRecord: document.getElementById('camera-record'),
+    cameraSnapshot: document.getElementById('camera-snapshot'),
+    cameraTimestamp: document.getElementById('camera-timestamp'),
+    recordingStatus: document.getElementById('recording-status'),
+    cameraUptime: document.getElementById('camera-uptime'),
+    cameraStorage: document.getElementById('camera-storage'),
+    motionDetected: document.getElementById('motion-detected'),
+    cameraPreview: document.getElementById('camera-preview'),
+    
+    // Analytics
+    peakUsage: document.getElementById('peak-usage'),
+    todayCost: document.getElementById('today-cost'),
+    carbonSaved: document.getElementById('carbon-saved'),
+    breakdownList: document.getElementById('breakdown-list'),
+    energyChart: document.getElementById('energy-chart'),
+    timeButtons: document.querySelectorAll('.time-btn'),
+    
+    // Devices
+    deviceToggles: document.querySelectorAll('.device-toggle'),
+    devicesAllOn: document.getElementById('devices-all-on'),
+    
+    // Activity
+    activityFeed: document.getElementById('activity-feed'),
+    clearActivity: document.getElementById('clear-activity'),
+    
+    // Notifications
+    notificationsContainer: document.getElementById('notifications-container'),
+    
+    // Modal
+    modal: document.getElementById('device-modal'),
+    modalTitle: document.getElementById('modal-title'),
+    modalBody: document.getElementById('modal-body'),
+    modalClose: document.getElementById('modal-close'),
+    
+    // Background Canvas
+    bgCanvas: document.getElementById('bg-canvas')
+};
+
+// Animation Objects
+class Particle {
     constructor() {
-        this.canvas = document.getElementById('bgCanvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.particles = [];
-        this.connections = [];
-        this.mouse = { x: 0, y: 0 };
-        this.animationSpeed = 1.5; // Increased speed
-        
-        this.init();
+        this.x = Math.random() * window.innerWidth;
+        this.y = Math.random() * window.innerHeight;
+        this.size = Math.random() * 3 + 1;
+        this.speedX = (Math.random() - 0.5) * 2;
+        this.speedY = (Math.random() - 0.5) * 2;
+        this.color = Math.random() > 0.5 ? state.theme === 'dark' ? '#4d94ff' : '#0066ff' : '#ff3366';
+        this.opacity = Math.random() * 0.5 + 0.2;
+        this.life = 1;
+        this.decay = 5;
     }
     
-    init() {
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
         
-        // Create particles
-        this.createParticles();
+        if (this.x > window.innerWidth) this.x = 0;
+        if (this.x < 0) this.x = window.innerWidth;
+        if (this.y > window.innerHeight) this.y = 0;
+        if (this.y < 0) this.y = window.innerHeight;
         
-        // Mouse tracking
-        document.addEventListener('mousemove', (e) => {
-            this.mouse.x = e.clientX;
-            this.mouse.y = e.clientY;
-        });
+        this.life -= this.decay;
+        this.opacity = this.life * 0.5;
         
-        // Click effects
-        document.addEventListener('click', (e) => {
-            this.createClickEffect(e.clientX, e.clientY);
-        });
-        
-        // Start animation
-        this.animate();
+        return this.life > 0;
     }
     
-    resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-    }
-    
-    createParticles() {
-        this.particles = [];
-        const particleCount = Math.min(Math.floor(window.innerWidth / 20), 100);
-        
-        for (let i = 0; i < particleCount; i++) {
-            this.particles.push({
-                x: Math.random() * this.canvas.width,
-                y: Math.random() * this.canvas.height,
-                size: Math.random() * 3 + 1,
-                speedX: (Math.random() - 0.5) * 2 * this.animationSpeed,
-                speedY: (Math.random() - 0.5) * 2 * this.animationSpeed,
-                color: `rgba(0, 102, 255, ${Math.random() * 0.5 + 0.2})`
-            });
-        }
-    }
-    
-    createClickEffect(x, y) {
-        // Create ripple effect
-        for (let i = 0; i < 10; i++) {
-            setTimeout(() => {
-                this.particles.push({
-                    x,
-                    y,
-                    size: Math.random() * 4 + 2,
-                    speedX: (Math.random() - 0.5) * 8 * this.animationSpeed,
-                    speedY: (Math.random() - 0.5) * 8 * this.animationSpeed,
-                    color: `rgba(0, 170, 255, ${Math.random() * 0.7 + 0.3})`,
-                    life: 1
-                });
-            }, i * 30);
-        }
-        
-        // Create connection burst
-        this.createConnectionBurst(x, y);
-    }
-    
-    createConnectionBurst(x, y) {
-        const connections = [];
-        const particleCount = 8;
-        
-        for (let i = 0; i < particleCount; i++) {
-            const angle = (i / particleCount) * Math.PI * 2;
-            connections.push({
-                x1: x,
-                y1: y,
-                x2: x + Math.cos(angle) * 100,
-                y2: y + Math.sin(angle) * 100,
-                progress: 0,
-                speed: 0.05 * this.animationSpeed,
-                color: `rgba(0, 102, 255, ${Math.random() * 0.5 + 0.5})`
-            });
-        }
-        
-        this.connections.push(...connections);
-    }
-    
-    updateParticles() {
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-            
-            // Update position
-            p.x += p.speedX;
-            p.y += p.speedY;
-            
-            // Bounce off walls
-            if (p.x < 0 || p.x > this.canvas.width) p.speedX *= -1;
-            if (p.y < 0 || p.y > this.canvas.height) p.speedY *= -1;
-            
-            // Apply mouse attraction
-            const dx = this.mouse.x - p.x;
-            const dy = this.mouse.y - p.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < 100) {
-                const force = (100 - distance) / 100;
-                p.speedX += (dx / distance) * force * 0.2 * this.animationSpeed;
-                p.speedY += (dy / distance) * force * 0.2 * this.animationSpeed;
-            }
-            
-            // Decay for click particles
-            if (p.life !== undefined) {
-                p.life -= 0.02 * this.animationSpeed;
-                if (p.life <= 0) {
-                    this.particles.splice(i, 1);
-                }
-            }
-            
-            // Limit speed
-            const speed = Math.sqrt(p.speedX * p.speedX + p.speedY * p.speedY);
-            if (speed > 3 * this.animationSpeed) {
-                p.speedX = (p.speedX / speed) * 3 * this.animationSpeed;
-                p.speedY = (p.speedY / speed) * 3 * this.animationSpeed;
-            }
-        }
-    }
-    
-    updateConnections() {
-        for (let i = this.connections.length - 1; i >= 0; i--) {
-            const c = this.connections[i];
-            c.progress += c.speed;
-            
-            if (c.progress >= 1) {
-                this.connections.splice(i, 1);
-            }
-        }
-    }
-    
-    drawParticles() {
-        this.particles.forEach(p => {
-            this.ctx.beginPath();
-            this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            this.ctx.fillStyle = p.color;
-            this.ctx.fill();
-            
-            // Add glow effect
-            if (p.life !== undefined) {
-                this.ctx.beginPath();
-                this.ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
-                this.ctx.fillStyle = `rgba(0, 170, 255, ${p.life * 0.2})`;
-                this.ctx.fill();
-            }
-        });
-    }
-    
-    drawConnections() {
-        // Draw connections between nearby particles
-        for (let i = 0; i < this.particles.length; i++) {
-            for (let j = i + 1; j < this.particles.length; j++) {
-                const p1 = this.particles[i];
-                const p2 = this.particles[j];
-                
-                const dx = p1.x - p2.x;
-                const dy = p1.y - p2.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < 100) {
-                    const opacity = 0.3 * (1 - distance / 100);
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(p1.x, p1.y);
-                    this.ctx.lineTo(p2.x, p2.y);
-                    this.ctx.strokeStyle = `rgba(0, 102, 255, ${opacity})`;
-                    this.ctx.lineWidth = 0.5;
-                    this.ctx.stroke();
-                }
-            }
-        }
-        
-        // Draw connection bursts
-        this.connections.forEach(c => {
-            const x = c.x1 + (c.x2 - c.x1) * c.progress;
-            const y = c.y1 + (c.y2 - c.y1) * c.progress;
-            
-            this.ctx.beginPath();
-            this.ctx.moveTo(c.x1, c.y1);
-            this.ctx.lineTo(x, y);
-            this.ctx.strokeStyle = c.color;
-            this.ctx.lineWidth = 2;
-            this.ctx.stroke();
-            
-            // Draw particle at the end
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, 3, 0, Math.PI * 2);
-            this.ctx.fillStyle = c.color;
-            this.ctx.fill();
-        });
-    }
-    
-    animate() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw gradient background
-        const gradient = this.ctx.createLinearGradient(0, 0, this.canvas.width, this.canvas.height);
-        gradient.addColorStop(0, 'rgba(0, 17, 34, 0.8)');
-        gradient.addColorStop(1, 'rgba(0, 34, 68, 0.8)');
-        this.ctx.fillStyle = gradient;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Update and draw
-        this.updateParticles();
-        this.updateConnections();
-        this.drawConnections();
-        this.drawParticles();
-        
-        // Draw grid overlay
-        this.drawGrid();
-        
-        requestAnimationFrame(() => this.animate());
-    }
-    
-    drawGrid() {
-        const gridSize = 50;
-        const offsetX = (Date.now() * 0.02) % gridSize;
-        const offsetY = (Date.now() * 0.02) % gridSize;
-        
-        this.ctx.strokeStyle = 'rgba(0, 102, 255, 0.05)';
-        this.ctx.lineWidth = 1;
-        
-        // Vertical lines
-        for (let x = -offsetX; x < this.canvas.width; x += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.canvas.height);
-            this.ctx.stroke();
-        }
-        
-        // Horizontal lines
-        for (let y = -offsetY; y < this.canvas.height; y += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.canvas.width, y);
-            this.ctx.stroke();
-        }
-    }
-    
-    updateSpeed(speed) {
-        this.animationSpeed = speed;
-        this.particles.forEach(p => {
-            p.speedX = (p.speedX / Math.abs(p.speedX || 1)) * Math.abs(p.speedX) * (speed / this.animationSpeed);
-            p.speedY = (p.speedY / Math.abs(p.speedY || 1)) * Math.abs(p.speedY) * (speed / this.animationSpeed);
-        });
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = this.opacity;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 }
 
-// Dashboard Application
-class SmartHomeDashboard {
+class Connection {
+    constructor(x1, y1, x2, y2) {
+        this.x1 = x1;
+        this.y1 = y1;
+        this.x2 = x2;
+        this.y2 = y2;
+        this.progress = 0;
+        this.speed = Math.random() * 0.02 + 0.01;
+        this.width = Math.random() * 1.5 + 0.5;
+        this.color = state.theme === 'dark' ? 'rgba(77, 148, 255, 0.3)' : 'rgba(0, 102, 255, 0.3)';
+        this.pulse = 0;
+    }
+    
+    update() {
+        this.progress = (this.progress + this.speed) % 1;
+        this.pulse = (this.pulse + 0.05) % (Math.PI * 2);
+    }
+    
+    draw(ctx) {
+        const x = this.x1 + (this.x2 - this.x1) * this.progress;
+        const y = this.y1 + (this.y2 - this.y1) * this.progress;
+        
+        const pulseWidth = this.width + Math.sin(this.pulse) * 0.5;
+        
+        ctx.save();
+        ctx.globalAlpha = 0.3 + Math.sin(this.pulse) * 0.2;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = pulseWidth;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(this.x1, this.y1);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        
+        // Draw moving dot
+        ctx.beginPath();
+        ctx.arc(x, y, pulseWidth * 2, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class DataStream {
     constructor() {
-        this.bgAnimation = null;
-        this.energyChart = null;
-        this.init();
+        this.x = Math.random() * window.innerWidth;
+        this.y = Math.random() * window.innerHeight;
+        this.length = Math.random() * 100 + 50;
+        this.speed = Math.random() * 2 + 1;
+        this.width = Math.random() * 2 + 1;
+        this.color = state.theme === 'dark' ? 'rgba(77, 148, 255, 0.5)' : 'rgba(0, 102, 255, 0.5)';
+        this.particles = [];
+        this.particleRate = 5;
     }
     
-    init() {
-        console.log('🚀 Initializing Smart Home Dashboard v4.0...');
+    update() {
+        this.y -= this.speed;
+        if (this.y < -this.length) {
+            this.y = window.innerHeight + this.length;
+            this.x = Math.random() * window.innerWidth;
+        }
         
-        // Initialize background animation
-        this.initBackground();
+        // Add particles
+        if (Math.random() < this.particleRate / 60) {
+            this.particles.push({
+                x: this.x + (Math.random() - 0.5) * 20,
+                y: this.y,
+                size: Math.random() * 2 + 1,
+                speed: Math.random() * 1 + 0.5,
+                life: 1
+            });
+        }
         
-        // Initialize theme
-        this.initTheme();
-        
-        // Initialize charts
-        this.initCharts();
-        
-        // Initialize device states
-        this.initDevices();
-        
-        // Set up event listeners
-        this.initEventListeners();
-        
-        // Start simulations
-        this.startSimulations();
-        
-        // Show welcome notification
-        this.showToast('System Online', 'All systems connected and ready', 'success');
-        this.addNotification('System initialized', 'All devices connected', 'info');
-        
-        console.log('✅ Dashboard initialized successfully');
+        // Update particles
+        this.particles = this.particles.filter(p => {
+            p.y -= p.speed;
+            p.life -= 0.02;
+            return p.life > 0;
+        });
     }
     
-    initBackground() {
-        this.bgAnimation = new BackgroundAnimation();
+    draw(ctx) {
+        // Draw main stream
+        ctx.save();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = this.width;
+        ctx.lineCap = 'round';
         
-        // Create additional background effects
-        this.createFloatingNodes();
-        this.createDataStreams();
-        this.createPulseEffects();
-        this.createConnectionMesh();
-        this.createEnergyRipples();
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x, this.y + this.length);
+        ctx.stroke();
+        
+        // Draw particles
+        this.particles.forEach(p => {
+            ctx.save();
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+        
+        ctx.restore();
+    }
+}
+
+// Initialize Application
+function initDashboard() {
+    console.log('🚀 Initializing Enhanced Smart Home Dashboard...');
+    
+    // Initialize animation
+    initAnimation();
+    
+    // Initialize theme
+    initTheme();
+    
+    // Initialize device states
+    initDevices();
+    
+    // Initialize charts
+    initCharts();
+    
+    // Set up event listeners
+    initEventListeners();
+    
+    // Start simulation
+    startSimulation();
+    
+    // Update current time
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 1000);
+    
+    // Show welcome notification
+    showNotification('Dashboard Online', 'All systems connected and ready.', 'success');
+    addActivity('System initialized', 'Dashboard is now online', 'success');
+    
+    // Initial update
+    updateAllDevices();
+    
+    console.log('✅ Dashboard initialized successfully');
+}
+
+// Initialize Animation
+function initAnimation() {
+    // Setup canvas
+    const canvas = DOM.bgCanvas;
+    const ctx = canvas.getContext('2d');
+    
+    state.animation.canvas = canvas;
+    state.animation.ctx = ctx;
+    
+    // Set canvas size
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
     }
     
-    createFloatingNodes() {
-        const container = document.querySelector('.floating-nodes');
-        const nodeCount = 15;
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Create initial particles
+    for (let i = 0; i < 100; i++) {
+        state.animation.particles.push(new Particle());
+    }
+    
+    // Create connections
+    for (let i = 0; i < 20; i++) {
+        const x1 = Math.random() * window.innerWidth;
+        const y1 = Math.random() * window.innerHeight;
+        const x2 = x1 + (Math.random() - 0.5) * 200;
+        const y2 = y1 + (Math.random() - 0.5) * 200;
+        state.animation.connections.push(new Connection(x1, y1, x2, y2));
+    }
+    
+    // Create data streams
+    for (let i = 0; i < 5; i++) {
+        state.animation.streams.push(new DataStream());
+    }
+    
+    // Mouse tracking
+    document.addEventListener('mousemove', (e) => {
+        state.animation.mouse.x = e.clientX;
+        state.animation.mouse.y = e.clientY;
+    });
+    
+    // Click effects
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.container')) {
+            createClickEffect(e.clientX, e.clientY);
+        }
+    });
+    
+    // Start animation loop
+    animate();
+}
+
+function animate(timestamp) {
+    const ctx = state.animation.ctx;
+    const canvas = state.animation.canvas;
+    
+    // Clear with fade effect
+    ctx.fillStyle = state.theme === 'dark' ? 'rgba(10, 14, 23, 0.1)' : 'rgba(248, 250, 252, 0.1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Calculate delta time
+    const deltaTime = timestamp - state.animation.lastTime;
+    state.animation.lastTime = timestamp;
+    const speedMultiplier = Math.min(deltaTime / 16, 2); // Normalize to 60fps
+    
+    // Update and draw particles
+    state.animation.particles = state.animation.particles.filter(p => p.update());
+    
+    // Add new particles occasionally
+    if (Math.random() < 0.1) {
+        state.animation.particles.push(new Particle());
+    }
+    
+    // Draw particles
+    state.animation.particles.forEach(p => p.draw(ctx));
+    
+    // Update and draw connections
+    state.animation.connections.forEach(c => {
+        c.update();
+        c.draw(ctx);
+    });
+    
+    // Update and draw data streams
+    state.animation.streams.forEach(s => {
+        s.update();
+        s.draw(ctx);
+    });
+    
+    // Draw mouse interaction
+    drawMouseInteraction(ctx);
+    
+    state.animation.animationId = requestAnimationFrame(animate);
+}
+
+function drawMouseInteraction(ctx) {
+    const mouse = state.animation.mouse;
+    
+    // Draw mouse ripple if recently clicked
+    if (state.lastClick && Date.now() - state.lastClick < 1000) {
+        const time = Date.now() - state.lastClick;
+        const radius = time * 0.2;
+        const alpha = 1 - time / 1000;
         
-        for (let i = 0; i < nodeCount; i++) {
-            const node = document.createElement('div');
-            node.className = 'floating-node';
-            
-            // Random position
-            node.style.left = `${Math.random() * 100}%`;
-            node.style.top = `${Math.random() * 100}%`;
-            
-            // Random size and animation delay
-            const size = 4 + Math.random() * 8;
-            node.style.width = `${size}px`;
-            node.style.height = `${size}px`;
-            node.style.animationDelay = `${Math.random() * 5}s`;
-            
-            container.appendChild(node);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = state.theme === 'dark' ? '#4d94ff' : '#0066ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+    
+    // Draw connection to mouse from nearby particles
+    const maxDistance = 150;
+    state.animation.particles.forEach(p => {
+        const dx = p.x - mouse.x;
+        const dy = p.y - mouse.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < maxDistance) {
+            ctx.save();
+            ctx.globalAlpha = 0.1 * (1 - distance / maxDistance);
+            ctx.strokeStyle = state.theme === 'dark' ? '#4d94ff' : '#0066ff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.stroke();
+            ctx.restore();
+        }
+    });
+}
+
+function createClickEffect(x, y) {
+    state.lastClick = Date.now();
+    
+    // Create ripple particles
+    for (let i = 0; i < 20; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 2 + 1;
+        const particle = new Particle();
+        particle.x = x;
+        particle.y = y;
+        particle.speedX = Math.cos(angle) * speed;
+        particle.speedY = Math.sin(angle) * speed;
+        particle.color = state.theme === 'dark' ? '#ff3366' : '#ff6699';
+        particle.size = Math.random() * 2 + 1;
+        particle.life = 1;
+        particle.decay = 0.02;
+        state.animation.particles.push(particle);
+    }
+}
+
+// Theme Management
+function initTheme() {
+    const savedTheme = localStorage.getItem('smartHomeTheme') || 'dark';
+    state.theme = savedTheme;
+    document.documentElement.setAttribute('data-theme', state.theme);
+    
+    DOM.themeToggle.addEventListener('click', toggleTheme);
+}
+
+function toggleTheme() {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', state.theme);
+    localStorage.setItem('smartHomeTheme', state.theme);
+    
+    // Update animation colors
+    state.animation.particles.forEach(p => {
+        p.color = Math.random() > 0.5 ? state.theme === 'dark' ? '#4d94ff' : '#0066ff' : '#ff3366';
+    });
+    
+    state.animation.connections.forEach(c => {
+        c.color = state.theme === 'dark' ? 'rgba(77, 148, 255, 0.3)' : 'rgba(0, 102, 255, 0.3)';
+    });
+    
+    state.animation.streams.forEach(s => {
+        s.color = state.theme === 'dark' ? 'rgba(77, 148, 255, 0.5)' : 'rgba(0, 102, 255, 0.5)';
+    });
+    
+    showNotification('Theme Changed', `Switched to ${state.theme} mode`, 'info');
+    addActivity('Theme changed', `Switched to ${state.theme} mode`, 'info');
+}
+
+// Device Initialization
+function initDevices() {
+    // Set initial timestamps
+    const now = new Date();
+    Object.values(state.devices).forEach(device => {
+        if (device.lastChange !== undefined) {
+            device.lastChange = now;
+        }
+    });
+}
+
+// Charts
+let energyChart = null;
+function initCharts() {
+    const ctx = DOM.energyChart.getContext('2d');
+    
+    energyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+            datasets: [{
+                label: 'Energy Usage',
+                data: state.analytics.data.day,
+                borderColor: '#0066ff',
+                backgroundColor: 'rgba(0, 102, 255, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#0066ff',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 1000,
+                easing: 'easeOutQuart'
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(25, 30, 50, 0.9)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#a0a7c2',
+                    borderColor: '#0066ff',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    padding: 12
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(160, 167, 194, 0.1)'
+                    },
+                    ticks: {
+                        color: '#a0a7c2',
+                        maxRotation: 0,
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(160, 167, 194, 0.1)'
+                    },
+                    ticks: {
+                        color: '#a0a7c2',
+                        callback: function(value) {
+                            return value + ' kW';
+                        },
+                        font: {
+                            size: 11
+                        }
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'nearest'
+            },
+            elements: {
+                line: {
+                    tension: 0.4
+                }
+            }
+        }
+    });
+}
+
+// Event Listeners
+function initEventListeners() {
+    // Theme toggle
+    DOM.themeToggle.addEventListener('click', toggleTheme);
+    
+    // Lights
+    DOM.toggleMainLight.addEventListener('change', toggleLights);
+    DOM.lightBrightness.addEventListener('input', updateBrightness);
+    DOM.roomToggles.forEach(toggle => {
+        toggle.addEventListener('change', toggleRoomLight);
+    });
+    DOM.colorPresets.forEach(preset => {
+        preset.addEventListener('click', changeLightColor);
+    });
+    DOM.lightsAllOn.addEventListener('click', toggleAllLights);
+    
+    // Thermostat
+    DOM.decreaseTemp.addEventListener('click', () => adjustTemperature(-1));
+    DOM.increaseTemp.addEventListener('click', () => adjustTemperature(1));
+    DOM.tempSlider.addEventListener('input', updateTemperatureSlider);
+    DOM.modeButtons.forEach(btn => {
+        btn.addEventListener('click', changeThermostatMode);
+    });
+    DOM.climateAuto.addEventListener('click', setAutoClimate);
+    
+    // Security
+    DOM.panicButton.addEventListener('click', triggerPanic);
+    DOM.armHome.addEventListener('click', () => armSecurity('home'));
+    DOM.armAway.addEventListener('click', () => armSecurity('away'));
+    DOM.disarmSystem.addEventListener('click', () => armSecurity('disarm'));
+    DOM.toggleCamera.addEventListener('click', toggleCamera);
+    DOM.cameraRecord.addEventListener('click', toggleRecording);
+    DOM.cameraSnapshot.addEventListener('click', takeSnapshot);
+    
+    // Analytics
+    DOM.timeButtons.forEach(btn => {
+        btn.addEventListener('click', changeAnalyticsPeriod);
+    });
+    
+    // Devices
+    DOM.deviceToggles.forEach(toggle => {
+        toggle.addEventListener('change', toggleDevice);
+    });
+    DOM.devicesAllOn.addEventListener('click', toggleAllDevices);
+    
+    // Activity
+    DOM.clearActivity.addEventListener('click', clearActivity);
+    
+    // Modal
+    DOM.modalClose.addEventListener('click', () => {
+        DOM.modal.classList.remove('active');
+    });
+    
+    // Device card clicks
+    document.querySelectorAll('.device-card, .stat-card, .device-item').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (!e.target.closest('button, input, .switch')) {
+                const deviceId = card.dataset.device || card.dataset.stat;
+                if (deviceId) {
+                    openDeviceModal(deviceId);
+                }
+            }
+        });
+    });
+}
+
+// Device Control Functions
+function toggleLights() {
+    const lights = state.devices.lights;
+    lights.status = DOM.toggleMainLight.checked;
+    lights.lastChange = new Date();
+    
+    if (lights.status && lights.brightness === 0) {
+        lights.brightness = 50;
+        DOM.lightBrightness.value = 50;
+    }
+    
+    updateLights();
+    
+    const message = lights.status 
+        ? `Main lights turned ON at ${lights.brightness}% brightness`
+        : 'Main lights turned OFF';
+    
+    showNotification('Lighting Control', message, lights.status ? 'success' : 'info');
+    addActivity('Main lights', lights.status ? 'Turned ON' : 'Turned OFF', lights.status ? 'success' : 'info');
+}
+
+function updateBrightness() {
+    const lights = state.devices.lights;
+    lights.brightness = parseInt(DOM.lightBrightness.value);
+    
+    if (!lights.status && lights.brightness > 0) {
+        lights.status = true;
+        DOM.toggleMainLight.checked = true;
+    }
+    
+    if (lights.status && lights.brightness === 0) {
+        lights.status = false;
+        DOM.toggleMainLight.checked = false;
+    }
+    
+    updateLights();
+    
+    if (lights.status) {
+        addActivity('Light brightness', `Set to ${lights.brightness}%`, 'info');
+    }
+}
+
+function toggleRoomLight(e) {
+    const room = e.target.dataset.room;
+    const lights = state.devices.lights;
+    lights.rooms[room] = e.target.checked;
+    
+    showNotification(
+        'Room Lighting',
+        `${room.replace('-', ' ').toUpperCase()} lights ${lights.rooms[room] ? 'ON' : 'OFF'}`,
+        lights.rooms[room] ? 'success' : 'info'
+    );
+    
+    addActivity(
+        `${room.replace('-', ' ')} lights`,
+        lights.rooms[room] ? 'Turned ON' : 'Turned OFF',
+        lights.rooms[room] ? 'success' : 'info'
+    );
+}
+
+function changeLightColor(e) {
+    const color = e.currentTarget.dataset.color;
+    const lights = state.devices.lights;
+    lights.color = color;
+    
+    // Update active state
+    DOM.colorPresets.forEach(p => p.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+    
+    showNotification('Lighting Color', `Set to ${color} white`, 'info');
+    addActivity('Light color', `Changed to ${color}`, 'info');
+}
+
+function toggleAllLights() {
+    const lights = state.devices.lights;
+    const allOn = !lights.status;
+    
+    lights.status = allOn;
+    DOM.toggleMainLight.checked = allOn;
+    
+    if (allOn && lights.brightness === 0) {
+        lights.brightness = 50;
+        DOM.lightBrightness.value = 50;
+    }
+    
+    // Turn on all rooms
+    Object.keys(lights.rooms).forEach(room => {
+        lights.rooms[room] = allOn;
+        const toggle = document.querySelector(`.room-toggle[data-room="${room}"]`);
+        if (toggle) toggle.checked = allOn;
+    });
+    
+    updateLights();
+    
+    showNotification(
+        'All Lights',
+        allOn ? 'All lights turned ON' : 'All lights turned OFF',
+        allOn ? 'success' : 'info'
+    );
+    
+    addActivity(
+        'All lights',
+        allOn ? 'Turned all lights ON' : 'Turned all lights OFF',
+        allOn ? 'success' : 'info'
+    );
+}
+
+function adjustTemperature(change) {
+    const thermo = state.devices.thermostat;
+    const newTemp = thermo.temperature + change;
+    
+    if (newTemp >= 60 && newTemp <= 85) {
+        thermo.temperature = newTemp;
+        thermo.setpoint = newTemp;
+        DOM.tempSlider.value = newTemp;
+        
+        updateThermostat();
+        
+        showNotification('Temperature Adjusted', `Set to ${newTemp}°C`, 'info');
+        addActivity('Temperature', `Adjusted to ${newTemp}°C`, 'info');
+        
+        checkTemperatureThresholds(newTemp);
+    }
+}
+
+function updateTemperatureSlider() {
+    const thermo = state.devices.thermostat;
+    thermo.temperature = parseInt(DOM.tempSlider.value);
+    thermo.setpoint = thermo.temperature;
+    
+    updateThermostat();
+    
+    addActivity('Temperature', `Set to ${thermo.temperature}°C via slider`, 'info');
+}
+
+function changeThermostatMode(e) {
+    const mode = e.currentTarget.dataset.mode;
+    const thermo = state.devices.thermostat;
+    thermo.mode = mode;
+    
+    // Update active state
+    DOM.modeButtons.forEach(btn => btn.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+    
+    updateThermostat();
+    
+    showNotification('Thermostat Mode', `Changed to ${mode.toUpperCase()} mode`, 'info');
+    addActivity('Thermostat mode', `Set to ${mode}`, 'info');
+}
+
+function setAutoClimate() {
+    const thermo = state.devices.thermostat;
+    thermo.mode = 'auto';
+    thermo.temperature = 72;
+    thermo.setpoint = 72;
+    DOM.tempSlider.value = 72;
+    
+    // Update active state
+    DOM.modeButtons.forEach(btn => btn.classList.remove('active'));
+    document.querySelector('.mode-btn[data-mode="auto"]').classList.add('active');
+    
+    updateThermostat();
+    
+    showNotification('Climate Control', 'Set to AUTO mode at 22.2°C', 'success');
+    addActivity('Climate control', 'Set to AUTO mode', 'success');
+}
+
+function armSecurity(mode) {
+    const security = state.devices.security;
+    
+    if (mode === 'disarm') {
+        security.armed = false;
+        security.mode = 'disarmed';
+        showNotification('Security System', 'System disarmed', 'info');
+        addActivity('Security system', 'Disarmed', 'info');
+    } else {
+        security.armed = true;
+        security.mode = mode;
+        const message = mode === 'home' ? 'Armed (Home Mode)' : 'Armed (Away Mode)';
+        showNotification('Security System', message, 'success');
+        addActivity('Security system', message, 'success');
+    }
+    
+    updateSecurity();
+}
+
+function triggerPanic() {
+    showNotification('PANIC ALERT', 'Emergency alert triggered! Authorities notified.', 'danger');
+    addActivity('PANIC BUTTON', 'Emergency alert activated', 'danger');
+    
+    // Flash red animation
+    document.body.style.backgroundColor = '#ff3366';
+    setTimeout(() => {
+        document.body.style.backgroundColor = '';
+    }, 500);
+    
+    // Send simulated alert
+    setTimeout(() => {
+        showNotification('Emergency Services', 'Alert received. Help is on the way.', 'warning');
+    }, 2000);
+}
+
+function toggleCamera() {
+    const camera = state.devices.camera;
+    camera.status = !camera.status;
+    camera.lastChange = new Date();
+    
+    if (camera.status) {
+        camera.live = false;
+        setTimeout(() => {
+            camera.live = true;
+            camera.recording = true;
+            updateCamera();
+            showNotification('Security Camera', 'Camera activated and recording', 'success');
+        }, 1500);
+    } else {
+        camera.live = false;
+        camera.recording = false;
+    }
+    
+    updateCamera();
+    
+    const message = camera.status 
+        ? 'Camera activated. Live feed starting...'
+        : 'Camera deactivated';
+    
+    showNotification('Security Camera', message, camera.status ? 'success' : 'info');
+    addActivity('Security camera', camera.status ? 'Activated' : 'Deactivated', camera.status ? 'success' : 'info');
+}
+
+function toggleRecording() {
+    const camera = state.devices.camera;
+    if (!camera.status) {
+        showNotification('Camera Offline', 'Please activate camera first', 'warning');
+        return;
+    }
+    
+    camera.recording = !camera.recording;
+    
+    showNotification(
+        'Recording',
+        camera.recording ? 'Recording started' : 'Recording stopped',
+        camera.recording ? 'success' : 'info'
+    );
+    
+    addActivity(
+        'Camera recording',
+        camera.recording ? 'Started' : 'Stopped',
+        camera.recording ? 'success' : 'info'
+    );
+    
+    updateCamera();
+}
+
+function takeSnapshot() {
+    const camera = state.devices.camera;
+    
+    if (!camera.status) {
+        showNotification('Camera Offline', 'Please activate camera first', 'warning');
+        return;
+    }
+    
+    camera.lastSnapshot = new Date();
+    camera.storage += 0.1;
+    
+    if (camera.storage > camera.maxStorage) {
+        showNotification('Storage Warning', 'Camera storage almost full', 'warning');
+    }
+    
+    showNotification('Snapshot', 'Photo captured and saved', 'success');
+    addActivity('Camera snapshot', 'Photo captured', 'success');
+    
+    updateCamera();
+}
+
+function toggleDevice(e) {
+    const deviceId = e.target.dataset.device;
+    const device = state.devices.devices[deviceId];
+    
+    if (device) {
+        device.status = e.target.checked;
+        
+        showNotification(
+            device.name,
+            device.status ? 'Turned ON' : 'Turned OFF',
+            device.status ? 'success' : 'info'
+        );
+        
+        addActivity(
+            device.name,
+            device.status ? 'Turned ON' : 'Turned OFF',
+            device.status ? 'success' : 'info'
+        );
+        
+        updateDevice(deviceId);
+    }
+}
+
+function toggleAllDevices() {
+    const devices = state.devices.devices;
+    const allOn = !Object.values(devices).every(d => d.status === true);
+    
+    Object.values(devices).forEach(device => {
+        device.status = allOn;
+        const toggle = document.querySelector(`.device-toggle[data-device="${device.id}"]`);
+        if (toggle) toggle.checked = allOn;
+        updateDevice(device.id);
+    });
+    
+    showNotification(
+        'All Devices',
+        allOn ? 'All smart devices turned ON' : 'All smart devices turned OFF',
+        allOn ? 'success' : 'info'
+    );
+    
+    addActivity(
+        'All smart devices',
+        allOn ? 'Turned all ON' : 'Turned all OFF',
+        allOn ? 'success' : 'info'
+    );
+}
+
+function changeAnalyticsPeriod(e) {
+    const period = e.currentTarget.dataset.period;
+    state.analytics.period = period;
+    
+    // Update active state
+    DOM.timeButtons.forEach(btn => btn.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+    
+    // Update chart
+    if (energyChart) {
+        energyChart.data.datasets[0].data = state.analytics.data[period];
+        energyChart.update();
+    }
+    
+    showNotification('Analytics Period', `Switched to ${period} view`, 'info');
+    addActivity('Analytics view', `Changed to ${period}`, 'info');
+}
+
+function clearActivity() {
+    state.activity = [];
+    updateActivityFeed();
+    showNotification('Activity Feed', 'All activity logs cleared', 'info');
+}
+
+// Update Functions
+function updateAllDevices() {
+    updateLights();
+    updateThermostat();
+    updateSecurity();
+    updateCamera();
+    updateDevices();
+    updateAnalytics();
+    updateQuickStats();
+}
+
+function updateLights() {
+    const lights = state.devices.lights;
+    
+    // Update UI
+    DOM.lightStatus.textContent = lights.status ? 'ONLINE' : 'OFFLINE';
+    DOM.lightStatus.style.color = lights.status ? '#00d68f' : '#ff3366';
+    DOM.brightnessValue.textContent = `${lights.brightness}%`;
+    DOM.lightEnergy.textContent = lights.energyUsage.toFixed(1);
+    DOM.lightUptime.textContent = formatUptime(lights.uptime);
+    DOM.lightCost.textContent = `${(lights.energyUsage * 100.12).toFixed(2)}Tshs`;
+    
+    // Update glow effect
+    if (lights.status && lights.brightness > 0) {
+        DOM.lightGlow.style.opacity = (lights.brightness / 100) * 0.5;
+        DOM.lightGlow.style.animation = `lightPulse ${2 - (lights.brightness / 100)}s ease-in-out infinite`;
+    } else {
+        DOM.lightGlow.style.opacity = '0';
+    }
+    
+    // Update color preset active state
+    DOM.colorPresets.forEach(p => {
+        p.classList.toggle('active', p.dataset.color === lights.color);
+    });
+}
+
+function updateThermostat() {
+    const thermo = state.devices.thermostat;
+    
+    // Update UI
+    DOM.temperatureValue.textContent = thermo.temperature;
+    DOM.setpointValue.textContent = `${thermo.setpoint}°C`;
+    DOM.homeTemp.textContent = `${thermo.temperature}°C`;
+    DOM.tempFill.style.width = `${((thermo.temperature - 60) / 25) * 100}%`;
+    DOM.thermostatMode.textContent = thermo.mode.toUpperCase();
+    DOM.thermostatEnergy.textContent = thermo.energyUsage.toFixed(1);
+    DOM.humidityValue.textContent = `${thermo.humidity}%`;
+    
+    // Update thermostat mode color
+    let modeColor;
+    switch(thermo.mode) {
+        case 'heat': modeColor = '#ff3366'; break;
+        case 'cool': modeColor = '#4d94ff'; break;
+        case 'fan': modeColor = '#00d68f'; break;
+        default: modeColor = '#ffaa00';
+    }
+    DOM.thermostatMode.style.color = modeColor;
+}
+
+function updateSecurity() {
+    const security = state.devices.security;
+    
+    // Update UI
+    DOM.securitySystemStatus.textContent = security.armed 
+        ? `ARMED ${security.mode.toUpperCase()}`
+        : 'DISARMED';
+    DOM.securityStatus.textContent = security.armed ? 'ARMED' : 'DISARMED';
+    
+    // Update sensor indicators
+    Object.entries(security.sensors).forEach(([sensor, data]) => {
+        const indicator = document.querySelector(`.sensor-item[data-sensor="${sensor}"]`);
+        if (indicator) {
+            indicator.classList.toggle('online', !data.active);
+            indicator.classList.toggle('offline', data.active);
+            indicator.querySelector('.sensor-status').textContent = data.status.toUpperCase();
+        }
+    });
+}
+
+function updateCamera() {
+    const camera = state.devices.camera;
+    
+    // Update UI
+    DOM.cameraPreview.classList.toggle('active', camera.status);
+    DOM.cameraTimestamp.textContent = camera.status ? new Date().toLocaleTimeString() : '--:--:--';
+    DOM.recordingStatus.style.display = camera.recording ? 'inline' : 'none';
+    DOM.cameraUptime.textContent = formatUptime(camera.uptime);
+    DOM.cameraStorage.textContent = `${camera.storage.toFixed(1)}/${camera.maxStorage} GB`;
+    DOM.motionDetected.textContent = camera.motionDetected ? 'Detected' : 'None';
+    
+    // Update overlay
+    const overlay = DOM.cameraPreview.querySelector('.camera-overlay');
+    if (camera.status) {
+        overlay.style.display = 'none';
+    } else {
+        overlay.style.display = 'flex';
+    }
+}
+
+function updateDevice(deviceId) {
+    const device = state.devices.devices[deviceId];
+    if (!device) return;
+    
+    const element = document.querySelector(`.device-item[data-device="${deviceId}"]`);
+    if (element) {
+        const status = element.querySelector('.device-status');
+        const power = element.querySelector('.device-power');
+        const metrics = element.querySelectorAll('.device-metrics span:nth-child(2)');
+        
+        status.classList.toggle('online', device.status);
+        status.classList.toggle('offline', !device.status);
+        power.textContent = device.status ? `${device.power}W` : '0W';
+        
+        if (metrics[0]) metrics[0].textContent = `${device.energyUsage.toFixed(1)} kWh`;
+        if (metrics[1]) metrics[1].textContent = `${(device.energyUsage * 0.12).toFixed(2)}Tshs`;
+    }
+}
+
+function updateDevices() {
+    Object.keys(state.devices.devices).forEach(deviceId => {
+        updateDevice(deviceId);
+    });
+}
+
+function updateAnalytics() {
+    // Update breakdown list
+    DOM.breakdownList.innerHTML = '';
+    
+    const devices = [
+        { name: 'Lighting', usage: state.devices.lights.energyUsage, color: '#ffaa00' },
+        { name: 'Climate Control', usage: state.devices.thermostat.energyUsage, color: '#ff3366' },
+        { name: 'Security System', usage: state.devices.camera.energyUsage, color: '#4d94ff' },
+        { name: 'Smart Devices', usage: Object.values(state.devices.devices).reduce((sum, d) => sum + d.energyUsage, 0), color: '#00d68f' }
+    ];
+    
+    const total = devices.reduce((sum, d) => sum + d.usage, 0);
+    
+    devices.forEach(device => {
+        const percentage = total > 0 ? (device.usage / total * 100) : 0;
+        const item = document.createElement('div');
+        item.className = 'breakdown-item';
+        item.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="breakdown-icon" style="background: ${device.color}">
+                    <div class="icon-placeholder"></div>
+                </div>
+                <span style="font-weight: 500;">${device.name}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-weight: 600;">${device.usage.toFixed(1)} kWh</span>
+                <span style="color: var(--text-tertiary); font-size: 0.9rem;">${percentage.toFixed(0)}%</span>
+            </div>
+        `;
+        DOM.breakdownList.appendChild(item);
+    });
+    
+    // Update stats
+    DOM.peakUsage.textContent = `${state.analytics.peakUsage.toFixed(1)} kW`;
+    DOM.todayCost.textContent = `${state.analytics.todayCost.toFixed(2)} Tshs`;
+    DOM.carbonSaved.textContent = `${state.analytics.carbonSaved.toFixed(1)} kg`;
+}
+
+function updateQuickStats() {
+    // Calculate current energy usage
+    let currentUsage = 0;
+    if (state.devices.lights.status) currentUsage += state.devices.lights.energyRate * (state.devices.lights.brightness / 100);
+    if (state.devices.thermostat.status !== 'idle') currentUsage += state.devices.thermostat.energyRate;
+    if (state.devices.camera.status) currentUsage += state.devices.camera.energyRate;
+    currentUsage += Object.values(state.devices.devices).reduce((sum, d) => sum + (d.status ? d.power / 1000 : 0), 0);
+    
+    DOM.currentEnergy.textContent = `${currentUsage.toFixed(1)} kW`;
+    DOM.energyProgress.style.width = `${Math.min((currentUsage / 3) * 100, 100)}%`;
+    
+    // Update network health with slight variations
+    if (Math.random() < 0.1) {
+        const health = 96 + Math.random() * 3;
+        DOM.networkHealth.textContent = `${health.toFixed(0)}%`;
+    }
+}
+
+// Activity Feed
+function addActivity(title, description, type = 'info') {
+    const activity = {
+        id: Date.now(),
+        title,
+        description,
+        type,
+        timestamp: new Date(),
+        icon: getActivityIcon(type)
+    };
+    
+    state.activity.unshift(activity);
+    if (state.activity.length > 10) state.activity.pop();
+    
+    updateActivityFeed();
+}
+
+function updateActivityFeed() {
+    DOM.activityFeed.innerHTML = '';
+    
+    state.activity.forEach(activity => {
+        const item = document.createElement('div');
+        item.className = 'activity-item';
+        item.innerHTML = `
+            <div class="activity-icon ${activity.type}">
+                <i class="fas fa-${activity.icon}"></i>
+            </div>
+            <div class="activity-content">
+                <div class="activity-title">${activity.title}</div>
+                <div class="activity-desc">${activity.description}</div>
+            </div>
+            <div class="activity-time">${formatTime(activity.timestamp)}</div>
+        `;
+        DOM.activityFeed.appendChild(item);
+    });
+}
+
+function getActivityIcon(type) {
+    const icons = {
+        success: 'check-circle',
+        warning: 'exclamation-triangle',
+        danger: 'times-circle',
+        info: 'info-circle'
+    };
+    return icons[type] || 'info-circle';
+}
+
+// Notifications
+function showNotification(title, message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-icon">
+            <i class="fas fa-${getActivityIcon(type)}"></i>
+        </div>
+        <div class="notification-content">
+            <h4>${title}</h4>
+            <p>${message}</p>
+        </div>
+    `;
+    
+    DOM.notificationsContainer.appendChild(notification);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        notification.style.animation = 'fadeOut 0.3s ease forwards';
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
+}
+
+// Utility Functions
+function formatUptime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+}
+
+function formatTime(date) {
+    return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+}
+
+function updateCurrentTime() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+    const dateStr = now.toLocaleDateString([], {weekday: 'short', month: 'short', day: 'numeric'});
+    
+    DOM.currentTime.querySelector('span').textContent = timeStr;
+    DOM.currentDate.querySelector('span').textContent = dateStr;
+}
+
+function checkTemperatureThresholds(temp) {
+    if (temp >= 78) {
+        showNotification('High Temperature', 'Consider lowering thermostat to save energy', 'warning');
+    } else if (temp <= 64) {
+        showNotification('Low Temperature', 'Consider raising thermostat for comfort', 'warning');
+    }
+}
+
+// Simulation
+function startSimulation() {
+    // Energy usage simulation
+    setInterval(() => {
+        simulateEnergyUsage();
+        simulateDeviceBehavior();
+        updateAllDevices();
+        updateChartData();
+        checkAlerts();
+    }, 5000); // Update every 5 seconds (faster)
+    
+    // Real-time elements update
+    setInterval(() => {
+        updateRealTimeElements();
+    }, 1000);
+}
+
+function simulateEnergyUsage() {
+    const now = new Date();
+    
+    // Lights
+    const lights = state.devices.lights;
+    if (lights.status) {
+        const hours = 5 / 3600;
+        const brightnessFactor = lights.brightness / 100;
+        lights.energyUsage += lights.energyRate * brightnessFactor * hours;
+        lights.uptime += 5;
+    }
+    
+    // Thermostat
+    const thermo = state.devices.thermostat;
+    if (thermo.status !== 'idle') {
+        const hours = 5 / 3600;
+        thermo.energyUsage += thermo.energyRate * hours;
+        
+        // Auto-adjust temperature based on mode
+        if (thermo.mode === 'heat' && thermo.temperature < thermo.setpoint) {
+            thermo.temperature = Math.min(thermo.temperature + 0.5, thermo.setpoint);
+        } else if (thermo.mode === 'cool' && thermo.temperature > thermo.setpoint) {
+            thermo.temperature = Math.max(thermo.temperature - 0.5, thermo.setpoint);
         }
     }
     
-    createDataStreams() {
-        const container = document.querySelector('.data-streams');
-        const streamCount = 8;
+    // Camera
+    const camera = state.devices.camera;
+    if (camera.status) {
+        const hours = 5 / 3600;
+        camera.energyUsage += camera.energyRate * hours;
+        camera.uptime += 5;
         
-        for (let i = 0; i < streamCount; i++) {
-            const stream = document.createElement('div');
-            stream.className = 'data-stream';
-            
-            // Random position
-            stream.style.left = `${Math.random() * 100}%`;
-            stream.style.animationDelay = `${Math.random() * 3}s`;
-            
-            // Random length and speed
-            const length = 50 + Math.random() * 100;
-            stream.style.height = `${length}px`;
-            stream.style.animationDuration = `${2 + Math.random() * 2}s`;
-            
-            container.appendChild(stream);
+        if (camera.recording) {
+            camera.storage += 0.05;
+            if (camera.storage > camera.maxStorage) {
+                camera.storage = camera.maxStorage;
+            }
         }
     }
     
-    createPulseEffects() {
-        const container = document.querySelector('.pulse-effects');
-        const pulseCount = 3;
-        
-        for (let i = 0; i < pulseCount; i++) {
-            const pulse = document.createElement('div');
-            pulse.className = 'pulse';
-            
-            // Random position
-            pulse.style.left = `${Math.random() * 100}%`;
-            pulse.style.top = `${Math.random() * 100}%`;
-            
-            // Random delay and duration
-            pulse.style.animationDelay = `${Math.random() * 4}s`;
-            pulse.style.animationDuration = `${3 + Math.random() * 3}s`;
-            
-            container.appendChild(pulse);
+    // Smart devices
+    Object.values(state.devices.devices).forEach(device => {
+        if (device.status) {
+            const hours = 5 / 3600;
+            device.energyUsage += (device.power / 1000) * hours;
         }
-    }
+    });
     
-    createConnectionMesh() {
-        const container = document.querySelector('.connection-mesh');
-        const lineCount = 12;
+    // Update analytics data
+    const hour = now.getHours();
+    state.analytics.data.day[hour] = 1.5 + Math.random() * 1.5;
+}
+
+function simulateDeviceBehavior() {
+    // Random security events (10% chance)
+    if (state.devices.security.armed && Math.random() < 0.1) {
+        const sensors = Object.keys(state.devices.security.sensors);
+        const randomSensor = sensors[Math.floor(Math.random() * sensors.length)];
+        const sensor = state.devices.security.sensors[randomSensor];
         
-        for (let i = 0; i < lineCount; i++) {
-            const line = document.createElement('div');
-            line.className = 'connection-line';
+        if (!sensor.active && Math.random() < 0.3) {
+            sensor.active = true;
+            sensor.lastTrigger = new Date();
             
-            // Random position and rotation
-            const x1 = Math.random() * 100;
-            const y1 = Math.random() * 100;
-            const length = 50 + Math.random() * 150;
-            const angle = Math.random() * 360;
-            
-            line.style.left = `${x1}%`;
-            line.style.top = `${y1}%`;
-            line.style.width = `${length}px`;
-            line.style.transform = `rotate(${angle}deg)`;
-            line.style.animationDelay = `${Math.random() * 2}s`;
-            
-            container.appendChild(line);
-        }
-    }
-    
-    createEnergyRipples() {
-        const container = document.querySelector('.energy-ripples');
-        const rippleCount = 5;
-        
-        for (let i = 0; i < rippleCount; i++) {
-            const ripple = document.createElement('div');
-            ripple.className = 'ripple';
-            
-            // Random position
-            ripple.style.left = `${Math.random() * 100}%`;
-            ripple.style.top = `${Math.random() * 100}%`;
-            
-            // Random delay and duration
-            ripple.style.animationDelay = `${Math.random() * 3}s`;
-            ripple.style.animationDuration = `${2 + Math.random() * 2}s`;
-            
-            container.appendChild(ripple);
-        }
-    }
-    
-    initTheme() {
-        // Set initial theme
-        document.documentElement.setAttribute('data-theme', state.theme);
-        
-        // Theme toggle
-        document.getElementById('theme-toggle').addEventListener('click', () => {
-            state.theme = state.theme === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', state.theme);
-            
-            this.showToast(
-                'Theme Changed',
-                `Switched to ${state.theme} mode`,
-                'info'
+            showNotification(
+                'Security Alert',
+                `${randomSensor.replace('-', ' ').toUpperCase()} triggered`,
+                'warning'
             );
             
-            this.addNotification('Theme changed', `Switched to ${state.theme} mode`, 'info');
-        });
-    }
-    
-    initCharts() {
-        const ctx = document.getElementById('energy-chart').getContext('2d');
-        
-        // Generate time labels
-        const labels = [];
-        for (let i = 0; i < 24; i++) {
-            labels.push(`${i}:00`);
-        }
-        
-        // Generate energy data
-        const data = labels.map(() => Math.random() * 2 + 0.5);
-        
-        this.energyChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Energy Usage (kW)',
-                    data: data,
-                    borderColor: '#0066FF',
-                    backgroundColor: 'rgba(0, 102, 255, 0.1)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#0066FF',
-                    pointBorderColor: '#FFFFFF',
-                    pointBorderWidth: 2,
-                    pointHoverRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(26, 34, 56, 0.9)',
-                        titleColor: '#FFFFFF',
-                        bodyColor: '#94A3B8',
-                        borderColor: '#475569',
-                        borderWidth: 1,
-                        padding: 12,
-                        cornerRadius: 8
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            color: 'rgba(148, 163, 184, 0.1)',
-                            drawBorder: false
-                        },
-                        ticks: {
-                            color: '#94A3B8',
-                            maxRotation: 0,
-                            font: {
-                                size: 11
-                            }
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: 'rgba(148, 163, 184, 0.1)',
-                            drawBorder: false
-                        },
-                        ticks: {
-                            color: '#94A3B8',
-                            callback: function(value) {
-                                return value + ' kW';
-                            },
-                            font: {
-                                size: 11
-                            }
-                        }
-                    }
-                },
-                interaction: {
-                    intersect: false,
-                    mode: 'nearest'
-                }
-            }
-        });
-    }
-    
-    initDevices() {
-        this.updateAllDevices();
-    }
-    
-    updateAllDevices() {
-        this.updateLighting();
-        this.updateClimate();
-        this.updateSecurity();
-        this.updateCameras();
-        this.updateSmartDevices();
-        this.updateAnalytics();
-    }
-    
-    updateLighting() {
-        const lighting = state.devices.lighting;
-        
-        // Update brightness
-        document.getElementById('brightness-value').textContent = `${lighting.brightness}%`;
-        document.getElementById('brightness-slider').value = lighting.brightness;
-        
-        // Update power
-        const power = lighting.power * (lighting.brightness / 100);
-        document.getElementById('light-energy').textContent = `${power.toFixed(1)} kW`;
-        
-        // Update toggle button
-        const toggleBtn = document.getElementById('light-toggle');
-        toggleBtn.classList.toggle('active', lighting.status);
-        toggleBtn.querySelector('.toggle-label').textContent = lighting.status ? 'ON' : 'OFF';
-        
-        // Update scene buttons
-        document.querySelectorAll('[data-scene]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.scene === lighting.scene);
-        });
-    }
-    
-    updateClimate() {
-        const climate = state.devices.climate;
-        
-        // Update temperature
-        document.getElementById('current-temp').textContent = climate.currentTemp;
-        document.getElementById('target-temp').textContent = `${climate.targetTemp}°F`;
-        
-        // Update status
-        document.getElementById('climate-status').textContent = climate.mode.toUpperCase();
-        
-        // Update humidity
-        document.getElementById('humidity').textContent = `${climate.humidity}%`;
-        
-        // Update energy
-        document.getElementById('climate-energy').textContent = `${climate.power} kW`;
-        
-        // Update preset buttons
-        document.querySelectorAll('[data-temp]').forEach(btn => {
-            btn.classList.toggle('active', parseInt(btn.dataset.temp) === climate.targetTemp);
-        });
-    }
-    
-    updateSecurity() {
-        const security = state.devices.security;
-        
-        // Update status
-        const statusEl = document.querySelector('.device-status.armed');
-        statusEl.textContent = security.armed ? 'ARMED' : 'DISARMED';
-        
-        // Update zones
-        Object.entries(security.zones).forEach(([zone, active]) => {
-            const zoneEl = document.querySelector(`[data-zone="${zone}"]`);
-            if (zoneEl) {
-                zoneEl.classList.toggle('active', active);
-            }
-        });
-    }
-    
-    updateCameras() {
-        const cameras = state.devices.cameras;
-        
-        Object.entries(cameras).forEach(([cameraId, camera]) => {
-            const cameraEl = document.getElementById(cameraId.replace('-', '-'));
-            if (cameraEl) {
-                const statusEl = cameraEl.querySelector('.camera-status');
-                statusEl.textContent = camera.status.toUpperCase();
-                statusEl.classList.toggle('live', camera.status === 'live');
-                
-                // Update timestamp
-                if (camera.status === 'live') {
-                    const timestamp = cameraEl.querySelector('.timestamp');
-                    if (timestamp) {
-                        timestamp.textContent = new Date().toLocaleTimeString();
-                    }
-                }
-            }
-        });
-        
-        // Update recording button
-        const recordBtn = document.getElementById('record-btn');
-        recordBtn.classList.toggle('recording', Object.values(cameras).some(c => c.recording));
-    }
-    
-    updateSmartDevices() {
-        Object.entries(state.devices.smartDevices).forEach(([deviceId, device]) => {
-            const tile = document.querySelector(`[data-device="${deviceId}"]`);
-            if (tile) {
-                const statusEl = tile.querySelector('.status');
-                const toggleBtn = tile.querySelector('.tile-toggle');
-                
-                if (statusEl) {
-                    statusEl.textContent = device.status ? 'ON' : 'OFF';
-                    statusEl.style.color = device.status ? '#00D4AA' : '#94A3B8';
-                }
-                
-                if (toggleBtn) {
-                    toggleBtn.classList.toggle('active', device.status);
-                }
-            }
-        });
-    }
-    
-    updateAnalytics() {
-        const analytics = state.analytics;
-        
-        // Update quick stats
-        document.getElementById('power-usage').textContent = `${analytics.avgUsage.toFixed(2)} kW`;
-        document.getElementById('connected-devices').textContent = analytics.connectedDevices;
-        document.getElementById('energy-saved').textContent = `${analytics.energySaved} kWh`;
-        
-        // Update analytics summary
-        document.getElementById('peak-usage').textContent = `${analytics.peakUsage.toFixed(1)} kW`;
-        document.getElementById('avg-usage').textContent = `${analytics.avgUsage.toFixed(1)} kWh`;
-        document.getElementById('daily-cost').textContent = `$${analytics.dailyCost.toFixed(2)}`;
-        document.getElementById('efficiency-score').textContent = `${analytics.efficiency}%`;
-        
-        // Update progress bars
-        const usageProgress = document.querySelector('#power-usage + .stat-progress .progress-bar');
-        if (usageProgress) {
-            usageProgress.style.width = `${(analytics.avgUsage / 3) * 100}%`;
-        }
-        
-        const efficiencyProgress = document.querySelector('.score-fill');
-        if (efficiencyProgress) {
-            efficiencyProgress.style.width = `${analytics.efficiency}%`;
+            addActivity(
+                'Security alert',
+                `${randomSensor.replace('-', ' ')} triggered`,
+                'warning'
+            );
+            
+            // Auto-clear after 30 seconds
+            setTimeout(() => {
+                sensor.active = false;
+                updateSecurity();
+            }, 30000);
         }
     }
     
-    initEventListeners() {
-        // Lighting controls
-        document.getElementById('brightness-slider').addEventListener('input', (e) => {
-            state.devices.lighting.brightness = parseInt(e.target.value);
-            this.updateLighting();
-            this.showToast('Brightness Adjusted', `Set to ${state.devices.lighting.brightness}%`, 'info');
-        });
-        
-        document.getElementById('light-toggle').addEventListener('click', () => {
-            state.devices.lighting.status = !state.devices.lighting.status;
-            this.updateLighting();
-            
-            const action = state.devices.lighting.status ? 'ON' : 'OFF';
-            this.showToast('Smart Lighting', `Turned ${action}`, 
-                state.devices.lighting.status ? 'success' : 'info');
-        });
-        
-        // Scene buttons
-        document.querySelectorAll('[data-scene]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const scene = e.currentTarget.dataset.scene;
-                state.devices.lighting.scene = scene;
-                
-                // Adjust brightness based on scene
-                switch(scene) {
-                    case 'relax':
-                        state.devices.lighting.brightness = 75;
-                        break;
-                    case 'focus':
-                        state.devices.lighting.brightness = 90;
-                        break;
-                    case 'night':
-                        state.devices.lighting.brightness = 25;
-                        break;
-                }
-                
-                this.updateLighting();
-                this.showToast('Lighting Scene', `${scene.charAt(0).toUpperCase() + scene.slice(1)} mode activated`, 'success');
-            });
-        });
-        
-        // Climate controls
-        document.getElementById('temp-down').addEventListener('click', () => {
-            if (state.devices.climate.targetTemp > 60) {
-                state.devices.climate.targetTemp--;
-                this.updateClimate();
-                this.showToast('Temperature', `Set to ${state.devices.climate.targetTemp}°F`, 'info');
-            }
-        });
-        
-        document.getElementById('temp-up').addEventListener('click', () => {
-            if (state.devices.climate.targetTemp < 85) {
-                state.devices.climate.targetTemp++;
-                this.updateClimate();
-                this.showToast('Temperature', `Set to ${state.devices.climate.targetTemp}°F`, 'info');
-            }
-        });
-        
-        // Temperature presets
-        document.querySelectorAll('[data-temp]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const temp = parseInt(e.currentTarget.dataset.temp);
-                state.devices.climate.targetTemp = temp;
-                this.updateClimate();
-                this.showToast('Temperature Preset', `Set to ${temp}°F`, 'success');
-            });
-        });
-        
-        // Security controls
-        document.querySelector('.arm-home').addEventListener('click', () => {
-            state.devices.security.armed = true;
-            state.devices.security.mode = 'home';
-            this.updateSecurity();
-            this.showToast('Security System', 'Armed (Home Mode)', 'success');
-        });
-        
-        document.querySelector('.arm-away').addEventListener('click', () => {
-            state.devices.security.armed = true;
-            state.devices.security.mode = 'away';
-            this.updateSecurity();
-            this.showToast('Security System', 'Armed (Away Mode)', 'success');
-        });
-        
-        document.querySelector('.disarm').addEventListener('click', () => {
-            state.devices.security.armed = false;
-            state.devices.security.mode = 'disarmed';
-            this.updateSecurity();
-            this.showToast('Security System', 'Disarmed', 'info');
-        });
-        
-        // Camera controls
-        document.getElementById('record-btn').addEventListener('click', () => {
-            const isRecording = Object.values(state.devices.cameras).some(c => c.recording);
-            Object.values(state.devices.cameras).forEach(camera => {
-                camera.recording = !isRecording;
-            });
-            
-            this.updateCameras();
-            
-            const action = isRecording ? 'stopped' : 'started';
-            this.showToast('Surveillance', `Recording ${action}`, 
-                isRecording ? 'info' : 'warning');
-        });
-        
-        document.getElementById('snapshot-btn').addEventListener('click', () => {
-            this.showToast('Snapshot', 'Photo saved to gallery', 'success');
-            this.addNotification('Snapshot captured', 'Camera 1 - Front Door', 'info');
-        });
-        
-        document.getElementById('all-cameras').addEventListener('click', () => {
-            const allActive = Object.values(state.devices.cameras).every(c => c.status === 'live');
-            Object.entries(state.devices.cameras).forEach(([cameraId, camera]) => {
-                camera.status = allActive ? 'idle' : 'live';
-            });
-            
-            this.updateCameras();
-            
-            const action = allActive ? 'deactivated' : 'activated';
-            this.showToast('All Cameras', `${action}`, 
-                allActive ? 'info' : 'success');
-        });
-        
-        // Smart device toggles
-        document.querySelectorAll('.tile-toggle').forEach(toggle => {
-            toggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const tile = e.target.closest('.device-tile');
-                const deviceId = tile.dataset.device;
-                
-                if (state.devices.smartDevices[deviceId]) {
-                    state.devices.smartDevices[deviceId].status = 
-                        !state.devices.smartDevices[deviceId].status;
-                    this.updateSmartDevices();
-                    
-                    const device = state.devices.smartDevices[deviceId];
-                    const action = device.status ? 'ON' : 'OFF';
-                    this.showToast(device.name, `Turned ${action}`, 
-                        device.status ? 'success' : 'info');
-                }
-            });
-        });
-        
-        // Device tile clicks (for modals)
-        document.querySelectorAll('.device-tile').forEach(tile => {
-            tile.addEventListener('click', (e) => {
-                if (!e.target.closest('.tile-toggle')) {
-                    const deviceId = tile.dataset.device;
-                    this.openDeviceModal(deviceId);
-                }
-            });
-        });
-        
-        // Time filter buttons
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                e.currentTarget.classList.add('active');
-                
-                const period = e.currentTarget.textContent.toLowerCase();
-                this.updateChartData(period);
-                this.showToast('Time Filter', `Showing ${period}ly data`, 'info');
-            });
-        });
-        
-        // Clear notifications
-        document.getElementById('clear-notifications').addEventListener('click', () => {
-            document.getElementById('notifications-list').innerHTML = `
-                <div class="notification-item">
-                    <div class="notification-icon info">
-                        <i class="fas fa-info-circle"></i>
-                    </div>
-                    <div class="notification-content">
-                        <div class="notification-title">No notifications</div>
-                        <div class="notification-time">Just now</div>
-                    </div>
-                </div>
-            `;
-            this.showToast('Notifications Cleared', 'All notifications removed', 'info');
-        });
-        
-        // Interactive card hover effects
-        document.querySelectorAll('.interactive').forEach(card => {
-            card.addEventListener('mouseenter', () => {
-                card.style.transform = 'translateY(-4px)';
-                card.style.boxShadow = '0 8px 32px rgba(0, 102, 255, 0.3)';
-            });
-            
-            card.addEventListener('mouseleave', () => {
-                card.style.transform = '';
-                card.style.boxShadow = '';
-            });
-        });
-        
-        // Window resize
-        window.addEventListener('resize', this.debounce(() => {
-            if (this.bgAnimation) {
-                this.bgAnimation.resize();
-                this.bgAnimation.createParticles();
-            }
-        }, 250));
-        
-        // Time update
-        this.updateTime();
-        setInterval(() => this.updateTime(), 1000);
-    }
-    
-    updateChartData(period) {
-        if (!this.energyChart) return;
-        
-        let labels, data;
-        
-        switch(period) {
-            case 'week':
-                labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                data = labels.map(() => Math.random() * 3 + 1);
-                break;
-            case 'month':
-                labels = Array.from({length: 30}, (_, i) => i + 1);
-                data = labels.map(() => Math.random() * 4 + 0.5);
-                break;
-            default: // day
-                labels = [];
-                for (let i = 0; i < 24; i++) {
-                    labels.push(`${i}:00`);
-                }
-                data = labels.map(() => Math.random() * 2 + 0.5);
-        }
-        
-        this.energyChart.data.labels = labels;
-        this.energyChart.data.datasets[0].data = data;
-        this.energyChart.update();
-    }
-    
-    startSimulations() {
-        // Update energy usage every 5 seconds
-        setInterval(() => {
-            this.simulateEnergyUsage();
-            this.updateAllDevices();
-        }, 5000);
-        
-        // Simulate temperature changes
-        setInterval(() => {
-            this.simulateClimate();
+    // Camera motion detection
+    if (state.devices.camera.status && Math.random() < 0.15) {
+        state.devices.camera.motionDetected = true;
+        setTimeout(() => {
+            state.devices.camera.motionDetected = false;
+            updateCamera();
         }, 10000);
-        
-        // Simulate random events
-        setInterval(() => {
-            this.simulateRandomEvents();
-        }, 15000);
-        
-        // Update analytics
-        setInterval(() => {
-            this.updateAnalyticsData();
-        }, 30000);
     }
     
-    simulateEnergyUsage() {
-        // Simulate random energy fluctuations
-        const fluctuation = (Math.random() - 0.5) * 0.3;
-        state.analytics.avgUsage = Math.max(0.5, state.analytics.avgUsage + fluctuation);
-        
-        // Update lighting energy
-        state.devices.lighting.energy += state.devices.lighting.power * (state.devices.lighting.brightness / 100) / 720;
-        
-        // Update climate energy
-        state.devices.climate.energy += state.devices.climate.power / 720;
-        
-        // Update peak usage
-        state.analytics.peakUsage = Math.max(state.analytics.peakUsage, state.analytics.avgUsage + 0.5);
-        
-        // Update cost
-        state.analytics.dailyCost = (state.analytics.avgUsage * 24 * 0.12).toFixed(2);
-        
-        // Update saved energy (random increase)
-        state.analytics.energySaved += Math.random() * 0.1;
-    }
-    
-    simulateClimate() {
-        // Simulate temperature drift
-        const drift = (Math.random() - 0.5) * 0.5;
-        state.devices.climate.currentTemp = 
-            Math.max(60, Math.min(85, state.devices.climate.currentTemp + drift));
-        
-        // Simulate humidity changes
-        const humidityChange = (Math.random() - 0.5) * 2;
-        state.devices.climate.humidity = 
-            Math.max(30, Math.min(60, state.devices.climate.humidity + humidityChange));
-        
-        // Update climate mode based on temperature difference
-        const diff = state.devices.climate.targetTemp - state.devices.climate.currentTemp;
-        if (Math.abs(diff) > 2) {
-            state.devices.climate.mode = diff > 0 ? 'heating' : 'cooling';
-        } else {
-            state.devices.climate.mode = 'idle';
+    // Random temperature fluctuations
+    if (Math.random() < 0.2) {
+        const change = (Math.random() - 0.5) * 0.5;
+        const thermo = state.devices.thermostat;
+        const newTemp = thermo.temperature + change;
+        if (newTemp >= 60 && newTemp <= 85) {
+            thermo.temperature = Math.round(newTemp * 10) / 10;
         }
     }
     
-    simulateRandomEvents() {
-        // Random device status changes
-        if (Math.random() < 0.2) {
-            const devices = Object.keys(state.devices.smartDevices);
-            const randomDevice = devices[Math.floor(Math.random() * devices.length)];
-            
-            if (state.devices.smartDevices[randomDevice]) {
-                state.devices.smartDevices[randomDevice].status = 
-                    !state.devices.smartDevices[randomDevice].status;
-                
-                this.updateSmartDevices();
-                
-                const device = state.devices.smartDevices[randomDevice];
-                const action = device.status ? 'activated' : 'deactivated';
-                this.addNotification(`Device ${action}`, device.name, 
-                    device.status ? 'success' : 'info');
-            }
+    // Random humidity fluctuations
+    if (Math.random() < 0.1) {
+        const change = (Math.random() - 0.5) * 2;
+        const newHumidity = state.devices.thermostat.humidity + change;
+        if (newHumidity >= 30 && newHumidity <= 60) {
+            state.devices.thermostat.humidity = Math.round(newHumidity);
         }
-        
-        // Random security alerts (5% chance)
-        if (state.devices.security.armed && Math.random() < 0.05) {
-            const zones = Object.keys(state.devices.security.zones);
-            const randomZone = zones[Math.floor(Math.random() * zones.length)];
-            
-            if (!state.devices.security.zones[randomZone]) {
-                state.devices.security.zones[randomZone] = true;
-                this.updateSecurity();
-                
-                this.showToast(
-                    'Security Alert',
-                    `Motion detected: ${randomZone.replace('-', ' ').toUpperCase()}`,
-                    'warning'
-                );
-                
-                this.addNotification(
-                    'Motion detected',
-                    `${randomZone.replace('-', ' ')}`,
-                    'alert'
-                );
-                
-                // Auto-clear after 30 seconds
-                setTimeout(() => {
-                    state.devices.security.zones[randomZone] = false;
-                    this.updateSecurity();
-                }, 30000);
-            }
-        }
-        
-        // Random efficiency changes
-        state.analytics.efficiency = Math.max(70, Math.min(95, 
-            state.analytics.efficiency + (Math.random() - 0.5) * 2));
     }
     
-    updateAnalyticsData() {
-        // Update connected devices count
-        let connectedCount = 0;
-        if (state.devices.lighting.status) connectedCount++;
-        if (state.devices.climate.status) connectedCount++;
-        if (state.devices.security.armed) connectedCount++;
-        connectedCount += Object.values(state.devices.smartDevices).filter(d => d.status).length;
+    // Update analytics metrics
+    state.analytics.peakUsage = 2.4 + Math.random() * 0.3;
+    state.analytics.todayCost = (Object.values(state.devices).reduce((sum, d) => sum + (d.energyUsage || 0), 0) * 0.12) + Math.random() * 0.1;
+    state.analytics.carbonSaved = 4.2 + Math.random() * 0.3;
+    state.analytics.efficiency = 85 + Math.random() * 10;
+}
+
+function updateChartData() {
+    if (energyChart) {
+        const now = new Date();
+        const hour = now.getHours();
         
-        state.analytics.connectedDevices = connectedCount;
+        // Add slight variation
+        const variation = (Math.random() - 0.5) * 0.3;
+        state.analytics.data.day[hour] = Math.max(0.2, (state.analytics.data.day[hour] || 1) + variation);
         
-        // Update efficiency based on usage
-        const usageEfficiency = Math.max(70, 100 - (state.analytics.avgUsage * 10));
-        state.analytics.efficiency = Math.round(
-            (state.analytics.efficiency * 0.7) + (usageEfficiency * 0.3)
+        energyChart.data.datasets[0].data = state.analytics.data[state.analytics.period];
+        energyChart.update('none');
+    }
+}
+
+function checkAlerts() {
+    // High energy usage
+    const totalEnergy = Object.values(state.devices).reduce((sum, d) => sum + (d.energyUsage || 0), 0);
+    if (totalEnergy > 15 && Math.random() < 0.1) {
+        showNotification(
+            'High Energy Usage',
+            `Total consumption: ${totalEnergy.toFixed(1)} kWh. Consider reducing usage.`,
+            'warning'
         );
     }
     
-    openDeviceModal(deviceId) {
-        const device = state.devices.smartDevices[deviceId];
-        if (!device) return;
-        
-        const modal = document.getElementById('modal-overlay');
-        const title = document.getElementById('modal-title');
-        const body = document.getElementById('modal-body');
-        
-        title.textContent = device.name;
-        
-        // Create modal content based on device type
-        let content = '';
-        
-        switch(deviceId) {
-            case 'plug1':
-                content = `
-                    <div style="display: flex; flex-direction: column; gap: 20px;">
-                        <div class="device-icon plug" style="align-self: center;">
-                            <i class="fas fa-plug"></i>
-                        </div>
-                        <div style="text-align: center;">
-                            <h4 style="margin-bottom: 10px; color: var(--text-primary);">Smart Plug</h4>
-                            <p style="color: var(--text-secondary);">Living Room Lamp</p>
-                        </div>
-                        <div style="background: var(--bg-glass-light); padding: 20px; border-radius: 12px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                                <span style="color: var(--text-secondary);">Status</span>
-                                <span style="color: ${device.status ? '#00D4AA' : '#FF4757'}; font-weight: 600;">
-                                    ${device.status ? 'ON' : 'OFF'}
-                                </span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                                <span style="color: var(--text-secondary);">Power Consumption</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">
-                                    ${device.power}W
-                                </span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: var(--text-secondary);">Energy Today</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">
-                                    ${(device.power * 24 / 1000).toFixed(2)} kWh
-                                </span>
-                            </div>
-                        </div>
-                        <button class="btn-camera" style="width: 100%;" onclick="dashboard.toggleDevice('${deviceId}')">
-                            <i class="fas fa-power-off"></i>
-                            <span>Turn ${device.status ? 'OFF' : 'ON'}</span>
-                        </button>
-                    </div>
-                `;
-                break;
-                
-            default:
-                content = `
-                    <div style="text-align: center; padding: 40px 20px;">
-                        <i class="fas fa-info-circle" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 20px;"></i>
-                        <p style="color: var(--text-secondary);">Detailed information for ${device.name}</p>
-                    </div>
-                `;
-        }
-        
-        body.innerHTML = content;
-        modal.classList.add('active');
-        
-        // Close modal when clicking outside
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-            }
-        });
-        
-        // Close button
-        document.getElementById('modal-close').addEventListener('click', () => {
-            modal.classList.remove('active');
-        }, { once: true });
-    }
-    
-    toggleDevice(deviceId) {
-        if (state.devices.smartDevices[deviceId]) {
-            state.devices.smartDevices[deviceId].status = 
-                !state.devices.smartDevices[deviceId].status;
-            this.updateSmartDevices();
-            
-            const device = state.devices.smartDevices[deviceId];
-            this.showToast(device.name, `Turned ${device.status ? 'ON' : 'OFF'}`, 
-                device.status ? 'success' : 'info');
-            
-            // Close modal
-            document.getElementById('modal-overlay').classList.remove('active');
-        }
-    }
-    
-    showToast(title, message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        
-        const icon = type === 'success' ? 'check-circle' :
-                     type === 'warning' ? 'exclamation-triangle' :
-                     type === 'error' ? 'times-circle' : 'info-circle';
-        
-        toast.innerHTML = `
-            <div style="font-size: 1.2rem; color: ${type === 'info' ? '#4361EE' : 
-                type === 'success' ? '#00D4AA' : 
-                type === 'warning' ? '#FFB800' : '#FF4757'};">
-                <i class="fas fa-${icon}"></i>
-            </div>
-            <div>
-                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
-                    ${title}
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                    ${message}
-                </div>
-            </div>
-        `;
-        
-        container.appendChild(toast);
-        
-        // Remove after 5 seconds
-        setTimeout(() => {
-            if (toast.parentNode) {
-                toast.style.animation = 'toastFadeOut 0.3s ease forwards';
-                setTimeout(() => {
-                    if (toast.parentNode) {
-                        toast.parentNode.removeChild(toast);
-                    }
-                }, 300);
-            }
-        }, 5000);
-    }
-    
-    addNotification(title, message, type = 'info') {
-        const list = document.getElementById('notifications-list');
-        const notification = document.createElement('div');
-        notification.className = 'notification-item';
-        
-        const iconClass = type === 'info' ? 'info' :
-                         type === 'success' ? 'success' :
-                         type === 'warning' ? 'warning' : 'alert';
-        
-        const icon = type === 'info' ? 'info-circle' :
-                    type === 'success' ? 'check-circle' :
-                    type === 'warning' ? 'exclamation-triangle' : 'shield-alt';
-        
-        notification.innerHTML = `
-            <div class="notification-icon ${iconClass}">
-                <i class="fas fa-${icon}"></i>
-            </div>
-            <div class="notification-content">
-                <div class="notification-title">${title}</div>
-                <div class="notification-time">Just now</div>
-            </div>
-        `;
-        
-        list.insertBefore(notification, list.firstChild);
-        
-        // Limit to 5 notifications
-        while (list.children.length > 5) {
-            list.removeChild(list.lastChild);
-        }
-        
-        // Update notification count
-        const countEl = document.querySelector('.notification-count');
-        if (countEl) {
-            const count = parseInt(countEl.textContent) + 1;
-            countEl.textContent = Math.min(count, 9);
-            if (count > 9) countEl.textContent = '9+';
-        }
-    }
-    
-    updateTime() {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
-        const dateStr = now.toLocaleDateString([], {weekday: 'short', month: 'short', day: 'numeric'});
-        
-        document.getElementById('current-time').textContent = `${dateStr} • ${timeStr}`;
-    }
-    
-    debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
+    // Camera storage warning
+    if (state.devices.camera.storage > state.devices.camera.maxStorage * 0.9 && Math.random() < 0.1) {
+        showNotification(
+            'Storage Warning',
+            'Camera storage almost full. Consider clearing old recordings.',
+            'warning'
+        );
     }
 }
 
-// Initialize dashboard when DOM is loaded
-let dashboard;
-document.addEventListener('DOMContentLoaded', () => {
-    dashboard = new SmartHomeDashboard();
-});
+function updateRealTimeElements() {
+    // Update camera timestamp if active
+    if (state.devices.camera.status) {
+        DOM.cameraTimestamp.textContent = new Date().toLocaleTimeString();
+    }
+    
+    // Random network fluctuations
+    if (Math.random() < 0.05) {
+        const bars = document.querySelectorAll('.signal-bars .bar');
+        bars.forEach((bar, i) => {
+            const threshold = (i + 1) * 20;
+            const health = 96 + Math.random() * 3;
+            bar.style.background = health >= threshold ? '#00d68f' : '#ffaa00';
+        });
+    }
+}
 
-// Make dashboard available globally for modal interactions
-window.dashboard = dashboard;
+// Modal Functions
+function openDeviceModal(deviceId) {
+    let title = '';
+    let content = '';
+    
+    switch(deviceId) {
+        case 'energy':
+            title = 'Energy Analytics';
+            content = `
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div>
+                        <h4 style="color: var(--text-secondary); margin-bottom: 10px;">Detailed Statistics</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="stat-box">
+                                <span>Peak Demand</span>
+                                <span style="font-weight: 700; color: var(--text-primary);">2.4 kW</span>
+                            </div>
+                            <div class="stat-box">
+                                <span>Avg Daily</span>
+                                <span style="font-weight: 700; color: var(--text-primary);">1.8 kW</span>
+                            </div>
+                            <div class="stat-box">
+                                <span>Monthly Cost</span>
+                                <span style="font-weight: 700; color: var(--text-primary);">10042.50Tshs</span>
+                            </div>
+                            <div class="stat-box">
+                                <span>Carbon Saved</span>
+                                <span style="font-weight: 700; color: var(--text-primary);">24.5 kg</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 style="color: var(--text-secondary); margin-bottom: 10px;">Usage Tips</h4>
+                        <ul style="color: var(--text-secondary); padding-left: 20px;">
+                            <li>Turn off lights when not in room</li>
+                            <li>Use smart plugs for vampire power</li>
+                            <li>Set thermostat schedule</li>
+                            <li>Consider energy-efficient appliances</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 'temperature':
+            title = 'Climate Control Details';
+            content = `
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div>
+                        <h4 style="color: var(--text-secondary); margin-bottom: 10px;">Current Status</h4>
+                        <p style="font-size: 1.2rem; color: var(--text-primary);">
+                            Temperature: ${state.devices.thermostat.temperature}°C<br>
+                            Humidity: ${state.devices.thermostat.humidity}%<br>
+                            Mode: ${state.devices.thermostat.mode.toUpperCase()}<br>
+                            Setpoint: ${state.devices.thermostat.setpoint}°C
+                        </p>
+                    </div>
+                    <div>
+                        <h4 style="color: var(--text-secondary); margin-bottom: 10px;">Schedule</h4>
+                        <div style="background: var(--bg-glass); padding: 15px; border-radius: var(--radius-md);">
+                            <p style="color: var(--text-secondary); margin: 0;">
+                                Next adjustment: 10:00 PM (Sleep Mode)<br>
+                                Daily schedule active
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        default:
+            title = 'Device Information';
+            content = `
+                <div style="text-align: center; padding: 40px 20px;">
+                    <i class="fas fa-info-circle" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 20px;"></i>
+                    <p style="color: var(--text-secondary);">Detailed information for ${deviceId} will be displayed here.</p>
+                </div>
+            `;
+    }
+    
+    DOM.modalTitle.textContent = title;
+    DOM.modalBody.innerHTML = content;
+    DOM.modal.classList.add('active');
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', initDashboard);
+
+// Export for debugging
+window.smartHomeState = state;
+window.dashboard = {
+    toggleLights,
+    adjustTemperature,
+    armSecurity,
+    toggleCamera,
+    showNotification,
+    addActivity
+};
